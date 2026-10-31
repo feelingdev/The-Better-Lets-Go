@@ -1,0 +1,20 @@
+# Never commit game data, keys or build output
+*.keys
+*.xci
+*.nsp
+*.nca
+*.bin
+*.gfpak
+*.dat
+*.tbl
+romfs/
+exefs/
+main
+main.npdm
+
+# Built files go in GitHub Releases
+*.ips
+*.zip
+dist/
+
+__pycache__/
