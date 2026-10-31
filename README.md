@@ -117,6 +117,12 @@ This project started as personal fixes to that mod, and its code was studied dur
 
 Also built with [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere), which applies the patch, and [Capstone](https://www.capstone-engine.org/), used by the build script.
 
+## License
+
+Copyright (C) 2026 feelingdev. This project is licensed under the [GNU General Public License v3.0](LICENSE) (GPL-3.0). You can use, change and share it, but any version you distribute must also make its source available under the same license. It comes with no warranty.
+
+The license only covers this project's own code, not the game or anything owned by others.
+
 ## Legal
 
 This is an unofficial fan project, and isn't affiliated with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pokémon Company. Pokémon is a trademark of its respective owners. You need your own legal copy of the game. This repo contains no game files, keys or ROMs, and the patch contains its own code plus a few of the game's instructions it has to relocate. Use it at your own risk.
