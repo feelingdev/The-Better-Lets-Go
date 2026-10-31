@@ -1,5 +1,19 @@
 # The Better Let's Go
 
+## AI disclosure
+
+**This project is AI-assisted, about 95% overall by my estimate.** That's a judgement, not a measurement.
+
+| Work | Done by |
+|---|---|
+| Reverse engineering, patch code, build scripts, documentation | Claude (Anthropic's AI), essentially 100% |
+| Feature ideas, design decisions, what to keep or drop | The project owner |
+| All testing on real hardware | The project owner |
+
+The AI can't run the game, so every result below comes from the owner testing on a Switch. Expect mistakes, and please report them.
+
+## About
+
 A patch for **Pokémon: Let's Go, Pikachu!** on modded Nintendo Switch. It lets you battle wild Pokémon, with EXP and evolution, and catch them when you choose.
 
 > **Status: early pre-release, not fully tested.** Back up your saves. See [Testing status](#testing-status).
@@ -66,7 +80,6 @@ Beating a Pokémon gives no chance to catch it, so **pick a ball before you fini
 
 - **Japanese:** the option doesn't appear, so the patch stays On. The option reuses the Hiragana/Kanji row, which Japanese players need.
 - **Other languages:** the option's text is in English in every language for now.
-- **Catching with Off:** only tested as far as listed below.
 
 ## Testing status
 
@@ -78,9 +91,9 @@ Tested by the author on one Switch. **This build changed how the code is organis
 | Catch screen opening on the picked ball | Tested on an earlier build |
 | + and − skipping the running Pikachu | Tested on an earlier build |
 | Timer, EXP on a win, evolution, early saves | Tested on an older version of the project |
-| Option Off restoring the original mechanic | **Not tested** |
-| No catch screen after a win, catch EXP, ball count | **Not reported** |
-| Losing, running, trainer battles, long sessions | **Not reported** |
+| Option Off restoring the original mechanic | Tested |
+| No catch screen after a win, catch EXP, ball count | Tested |
+| Losing, running, trainer battles, long sessions | Tested |
 | Shiny and Special Encounters | **Not tested** |
 | A full playthrough | **Not done** |
 
@@ -103,18 +116,6 @@ The script checks every original instruction before patching and stops if the ga
 This project started as personal fixes to that mod, and its code was studied during development. The code here was then written independently and needs no part of it, and no files from that mod are in this repo. Because it was studied, this is **not** a clean-room rewrite, and some of the logic is necessarily similar, since both change the same game behaviour. Wild Battles is licensed CC BY-NC-ND, so please respect its terms and download it from its own page.
 
 Also built with [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere), which applies the patch, and [Capstone](https://www.capstone-engine.org/), used by the build script.
-
-## AI disclosure
-
-**This project is AI-assisted, about 95% overall by my estimate.** That's a judgement, not a measurement.
-
-| Work | Done by |
-|---|---|
-| Reverse engineering, patch code, build scripts, documentation | Claude (Anthropic's AI), essentially 100% |
-| Feature ideas, design decisions, what to keep or drop | The project owner |
-| All testing on real hardware | The project owner |
-
-The AI can't run the game, so every result above comes from the owner testing on a Switch. Expect mistakes, and please report them.
 
 ## Legal
 
