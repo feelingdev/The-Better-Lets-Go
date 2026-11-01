@@ -18,6 +18,16 @@ A patch for **Pokémon: Let's Go, Pikachu!** on modded Nintendo Switch. It lets 
 
 > **Status: early pre-release, not fully tested.** Back up your saves. See [Testing status](#testing-status).
 
+## See it in action
+
+| Enable Wild Battle: **On** | Enable Wild Battle: **Off** |
+|---|---|
+| ![With the option On, a wild Rattata starts a battle with Pikachu](docs/images/option-on.gif) | ![With the option Off, a wild Rattata goes straight to the normal catch screen](docs/images/option-off.gif) |
+
+The option in the Options menu:
+
+<img src="docs/images/option.jpg" width="600" alt="The Enable Wild Battle row in the Options menu, with its description">
+
 ## Features
 
 All of these can be switched off in-game, except the intro skip.
@@ -125,4 +135,4 @@ The license only covers this project's own code, not the game or anything owned 
 
 ## Legal
 
-This is an unofficial fan project, and isn't affiliated with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pokémon Company. Pokémon is a trademark of its respective owners. You need your own legal copy of the game. This repo contains no game files, keys or ROMs, and the patch contains its own code plus a few of the game's instructions it has to relocate. Use it at your own risk.
+This is an unofficial fan project, and isn't affiliated with or endorsed by Nintendo, Game Freak, Creatures Inc. or The Pokémon Company. Pokémon is a trademark of its respective owners. You need your own legal copy of the game. This repo contains no game files, keys or ROMs, and the patch contains its own code plus a few of the game's instructions it has to relocate. The images in `docs/images` are captures of the game, used to show what the patch does, and they aren't covered by this project's license. Use it at your own risk.
