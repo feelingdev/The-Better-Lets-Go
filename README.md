@@ -107,6 +107,28 @@ Tested by the author on one Switch. **This build changed how the code is organis
 | Shiny and Special Encounters | **Not tested** |
 | A full playthrough | **Not done** |
 
+## Help test this
+
+Testers are very welcome, and this is the area that needs the most help. Please back up your save first and stay offline.
+
+**Most useful right now:**
+
+- A full playthrough, especially story catches and any moment that hangs or repeats
+- Legendaries and Snorlax, with the option On and Off
+- Shiny and Special Encounters
+- Other game languages, since only English has been tested
+- Other controller setups, such as a single Joy-Con or a Poké Ball Plus
+
+**To report a result,** [open an issue](../../issues/new) and include:
+
+- What you did, what you expected and what happened
+- Your Atmosphère version, game language and controller setup
+- How far you are in the game, and whether the option was On or Off
+- A screenshot or short clip, if you can
+- If the game crashed, the newest report from `/atmosphere/crash_reports/` ending in `_010003f003a34000.log`
+
+Reports that something works are useful too. Please don't share save files, keys or game files.
+
 ## Building from source
 
 This needs your own decompressed `main` from the game (1.0.2), with its 0x100-byte header still attached. No game files are in this repo.
