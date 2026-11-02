@@ -322,21 +322,25 @@ assert pc() == orig_at
 emit(struct.unpack_from("<I", image, 0x7E5F00)[0])
 emit(b(pc(), 0x7E5F04))
 
-# --- Intro skip with the game's demo skip input (pad +0x40, bit 61). Falls through when not pressed.
+# --- Intro skip on + - A B X Y. Pad +0x40 keeps the raw button bits alongside the game's action bits (see the map at 0x14C550);
+# the action bits can't be used, because bit 57 also covers L, R, ZL, ZR and the stick clicks. Falls through when not pressed.
+SKIP_BUTTONS = 0x1 | 0x2 | 0x4 | 0x8 | 0x400 | 0x800   # A, B, X, Y, +, -
 PAD_GOT = 0x15FAEA0
 TITLE_FLAG = FLAG + 1     # set while the boot event's title demo runs
 SKIP_TO = 500             # title demo: where the sparkle intro ends and the logo idle begins
 
 
 def skip_pressed(done):
-    """Branch to the label named `done` unless skip is pressed. Uses x9 only."""
+    """Branch to the label named `done` unless skip is pressed. Uses x9 and x10."""
     emit(adrp(pc(), 9, PAD_GOT))
     emit(ldr(9, 9, PAD_GOT & 0xFFF))
     emit(ldr(9, 9, 0))
-    pending.append((len(code), "cbz", done))
+    pending.append(len(code))
     emit(0)
     emit(ldr(9, 9, 0xB0))         # first pad (+0x70) buttons (+0x40)
-    pending.append((len(code), "tbz61", done))
+    emit(0x5280000A | (SKIP_BUTTONS << 5))   # mov w10, #SKIP_BUTTONS
+    emit(0x8A0A0129)              # and x9, x9, x10
+    pending.append(len(code))
     emit(0)
 
 
@@ -344,12 +348,8 @@ pending = []
 
 
 def resolve(target):
-    for idx, kind, _ in pending:
-        at = CAVE + idx * 4
-        if kind == "cbz":
-            code[idx] = cbz(at, target, 9, wide=True)
-        else:
-            code[idx] = 0xB6000000 | (29 << 19) | ((((target - at) >> 2) & 0x3FFF) << 5) | 9
+    for idx in pending:
+        code[idx] = cbz(CAVE + idx * 4, target, 9, wide=True)
     pending.clear()
 
 
@@ -547,6 +547,198 @@ emit(struct.unpack_from("<I", image, 0x319EB4)[0])  # the original two instructi
 emit(struct.unpack_from("<I", image, 0x319EB8)[0])
 emit(b(pc(), 0x319EBC))
 
+# --- Options row 11, "Level-Up Trade Evolution". Not on Japanese, because its text is English only.
+# The choice is bit 30 of the saved settings word (+0x54): 0 = off, so existing saves start off.
+# TRADE_EVO holds the screen's working value, loaded and applied alongside the game's own option values.
+TRADE_EVO = FLAG + 5
+TRADE_INFO_AT = 0xD32FE0  # the row's description label name, at the end of the padding used by the text below
+TRADE_INFO_NAME = "tbl_trade_evo_info"
+LANG_GOT = 0x15FAEF0
+ROW_ID = 11
+LABEL_ON = 0xB47AA6D4ACE0ED81
+LABEL_OFF = 0xB47AA3D4ACE0E868
+
+
+def label_hash(name):
+    """The game's label hash: FNV-1a with its own start value."""
+    h = 0xCBF29CE484222645
+    for c in name.encode():
+        h = ((h ^ c) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return h
+
+
+assert label_hash("msg_option_02_info") == 0x72DC9B7C22B155DE
+TRADE_TITLE = label_hash("tbl_trade_evo_title")
+TRADE_INFO = label_hash(TRADE_INFO_NAME)
+
+
+def mov_x1(value):
+    for shift, op in ((0, 0xD2800001), (16, 0xF2A00001), (32, 0xF2C00001), (48, 0xF2E00001)):
+        emit(op | (((value >> shift) & 0xFFFF) << 5))
+
+
+def b_cond(src, dst, cond):
+    assert -0x100000 <= dst - src < 0x100000, (hex(src), hex(dst))
+    return 0x54000000 | (((dst - src) >> 2 & 0x7FFFF) << 5) | cond
+
+
+EQ = 0
+
+
+def row_id_check(compare_word, original_word, resume):
+    """Compare against our row; anything else runs the original compare and goes back. Returns the b.eq slot."""
+    emit(compare_word)
+    slot = len(code)
+    emit(0)                       # b.eq, patched by the caller
+    emit(original_word)
+    emit(b(pc(), resume))
+    return slot
+
+
+def patch_eq(slot):
+    code[slot] = b_cond(CAVE + slot * 4, pc(), EQ)
+
+
+# List allocation: room for two more rows, so adding ours doesn't need the vector to grow. The caller's count is put back.
+mark("row_alloc")
+emit(0xA9BE7BFD)                  # stp x29, x30, [sp, #-0x20]!
+emit(0x910003FD)                  # mov x29, sp
+emit(str_x(2, 31, 0x10))
+emit(0xB9400049)                  # ldr w9, [x2]
+emit(0x11000929)                  # add w9, w9, #2
+emit(0xB9000049)                  # str w9, [x2]
+emit(bl(pc(), 0x45F00))
+emit(ldr(2, 31, 0x10))
+emit(0xB9400049)                  # ldr w9, [x2]
+emit(0x51000929)                  # sub w9, w9, #2
+emit(0xB9000049)                  # str w9, [x2]
+emit(0xA8C27BFD)                  # ldp x29, x30, [sp], #0x20
+emit(RET)
+
+# End of the row builder: add our two rows last, the way its own loop adds the others.
+# The builder itself keeps row 3 for Japanese only, so "Enable Wild Battle" (row 3 elsewhere) is added here.
+mark("row_add")
+emit(adrp(pc(), 9, LANG_GOT))
+emit(ldr(9, 9, LANG_GOT & 0xFFF))
+emit(ldr(9, 9, 0))
+emit(0x39414129)                  # ldrb w9, [x9, #0x50]
+emit(0x7100053F)                  # cmp w9, #1
+add_skip = len(code)
+emit(0)                           # b.eq done
+for row in (3, ROW_ID):
+    emit(ldr(8, 19, 0x278))
+    emit(0x91028100)              # add x0, x8, #0xa0
+    emit(0xD100A3A1)              # sub x1, x29, #0x28
+    emit(0x52800009 | (row << 5)) # mov w9, #row
+    emit(struct.unpack_from("<I", image, 0x427E8)[0])   # stur w9, [x29, #-0x28]
+    emit(struct.unpack_from("<I", image, 0x427EC)[0])   # sturb wzr, [x29, #-0x24]
+    emit(bl(pc(), 0x46980))
+patch_eq(add_skip)
+emit(struct.unpack_from("<I", image, 0x42804)[0])
+emit(b(pc(), 0x42808))
+
+# Row text: title and current value.
+mark("row_text")
+slot = row_id_check(0x71002F1F, struct.unpack_from("<I", image, 0x44DD4)[0], 0x44DD8)   # cmp w24, #11
+patch_eq(slot)
+mov_x1(TRADE_TITLE)
+emit(0xAA1303E0)                  # mov x0, x19
+emit(0xAA1503E2)                  # mov x2, x21
+emit(bl(pc(), 0x44130))
+emit(adrp(pc(), 8, TRADE_EVO))
+emit(flag_ldrb(8, 8, TRADE_EVO))
+emit(cbz(pc(), pc() + 24, 8, nz=True))   # value 1 = On
+mov_x1(LABEL_OFF)
+emit(b(pc(), pc() + 20))
+mov_x1(LABEL_ON)
+emit(b(pc(), 0x45164))
+
+# Left or right on the row: flip it.
+mark("row_toggle")
+slot = row_id_check(0x7100251F, struct.unpack_from("<I", image, 0x3F8D8)[0], 0x3F8DC)   # cmp w8, #9 (row - 2)
+patch_eq(slot)
+emit(adrp(pc(), 8, TRADE_EVO))
+emit(flag_ldrb(9, 8, TRADE_EVO))
+emit(0x52000129)                  # eor w9, w9, #1
+emit(flag_strb(9, 8, TRADE_EVO))
+emit(b(pc(), 0x3FAB4))
+
+# The arrow reaction after a change, as the other On/Off rows do it.
+mark("row_arrow")
+slot = row_id_check(0x7100251F, struct.unpack_from("<I", image, 0x452D4)[0], 0x452D8)   # cmp w8, #9 (row - 2)
+patch_eq(slot)
+emit(adrp(pc(), 8, TRADE_EVO))
+emit(flag_ldrb(8, 8, TRADE_EVO))
+emit(0x52800029)                  # mov w9, #1
+emit(0x37F80042)                  # tbnz w2, #31, over the next branch
+emit(b(pc(), 0x45388))
+emit(b(pc(), 0x4536C))
+
+# Description: the game's label name table has no entry 11 (it's null), so give our row its own name.
+mark("row_info")
+slot = row_id_check(0x71002E9F, struct.unpack_from("<I", image, 0x3EBC0)[0], 0x3EBC4)   # cmp w20, #11
+patch_eq(slot)
+emit(adrp(pc(), 10, TRADE_INFO_AT))
+emit(0x91000000 | ((TRADE_INFO_AT & 0xFFF) << 10) | (10 << 5) | 10)   # add x10, x10, #lo
+emit(b(pc(), 0x3EBC4))
+
+# Screen opens: working value from the save.
+mark("row_load")
+emit(ldr(9, 8, 8))
+emit(0xB9405529)                  # ldr w9, [x9, #0x54]
+emit(0x531E7929)                  # ubfx w9, w9, #30, #1
+emit(adrp(pc(), 10, TRADE_EVO))
+emit(flag_strb(9, 10, TRADE_EVO))
+emit(struct.unpack_from("<I", image, 0x3B37C)[0])
+emit(b(pc(), 0x3B380))
+
+# Settings applied: working value to the save.
+mark("row_apply")
+emit(struct.unpack_from("<I", image, 0x3B404)[0])   # ldr x0, [x8, #8]
+emit(0xB9405409)                  # ldr w9, [x0, #0x54]
+emit(adrp(pc(), 10, TRADE_EVO))
+emit(flag_ldrb(10, 10, TRADE_EVO))
+emit(0x33020149)                  # bfi w9, w10, #30, #1
+emit(0xB9005409)                  # str w9, [x0, #0x54]
+emit(b(pc(), 0x3B408))
+
+# Changed check: our value counts too, or changing only this row wouldn't be saved.
+mark("row_changed")
+emit(struct.unpack_from("<I", image, 0x3F494)[0])   # ldr x0, [x19, #8]
+emit(0xB9405409)                  # ldr w9, [x0, #0x54]
+emit(0x531E7929)                  # ubfx w9, w9, #30, #1
+emit(adrp(pc(), 10, TRADE_EVO))
+emit(flag_ldrb(10, 10, TRADE_EVO))
+emit(0x6B0A013F)                  # cmp w9, w10
+emit(b_cond(pc(), pc() + 8, EQ))
+emit(b(pc(), 0x3F4D0))            # changed
+emit(b(pc(), 0x3F498))
+
+# --- Level-up evolution check, x19 = Pokemon, x20 = evolution record. With the row on, a trade evolution (method 5)
+# passes at TRADE_EVO_LEVEL, the way a level-up evolution (method 4) passes at its own level. Trading is untouched.
+TRADE_EVO_LEVEL = 50
+mark("trade_evolution")
+emit(struct.unpack_from("<I", image, 0x722BF8)[0])  # ldr w8, [x20]
+emit(0x7100151F)                  # cmp w8, #5
+trade_slot = len(code)
+emit(0)                           # b.eq check
+emit(b(pc(), 0x722BFC))
+patch_eq(trade_slot)
+trade_skips = []
+read_setting(9, trade_skips)
+emit(0xB9405529)                  # ldr w9, [x9, #0x54]
+trade_off = len(code)
+emit(0)                           # tbz w9, #30, off
+emit(0xAA1303E0)                  # mov x0, x19
+emit(bl(pc(), 0x726580))
+emit(0x7100001F | (TRADE_EVO_LEVEL << 10))   # cmp w0, #50
+emit(0x1A9F37F5)                  # cset w21, hs
+emit(b(pc(), 0x722F50))
+code[trade_off] = 0x36F00009 | (((pc() - (CAVE + trade_off * 4)) >> 2) << 5)
+for slot in trade_skips:
+    code[slot] = cbz(CAVE + slot * 4, pc(), 9, wide=True)
+emit(b(pc(), 0x722BFC))
+
 blob = b"".join(struct.pack("<I", w) for w in code)
 assert CAVE + len(blob) <= LIMIT, hex(CAVE + len(blob))
 
@@ -606,7 +798,6 @@ TAIL_END = 0xD33000
 assert not any(image[0xD32BA8:TAIL_END])
 tail = []
 tail_marks = {}
-LANG_GOT = 0x15FAEF0
 
 
 def tpc():
@@ -715,6 +906,8 @@ STRINGS = [
     (0xB47AA6D4ACE0ED81, "On"),
     (0xB47AA3D4ACE0E868, "Off"),
     (0x72DC9B7C22B155DE, "Battle wild Pok\u00e9mon before catching them.\nTurn this off for the game\u2019s normal catching."),
+    (TRADE_TITLE, "Level-Up Trade Evolution"),
+    (TRADE_INFO, "Kadabra, Machoke, Graveler and Haunter can also\nevolve by leveling up, starting at Level 50."),
 ]
 table_at = tpc()
 at = TAIL + table_slot * 4
@@ -731,9 +924,10 @@ for i, (h, t) in enumerate(STRINGS):
 words.append(bytes(16))
 tail_code = b"".join(struct.pack("<I", w) for w in tail)
 tail_blob = tail_code + b"".join(words) + bytes(pool)
-assert TAIL + len(tail_blob) <= TAIL_END, hex(TAIL + len(tail_blob))
+assert TAIL + len(tail_blob) <= TRADE_INFO_AT, hex(TAIL + len(tail_blob))
+trade_info_name = TRADE_INFO_NAME.encode() + b"\0"
+assert TRADE_INFO_AT + len(trade_info_name) <= TAIL_END
 
-edits.append(site(0x426DC, "tbz w0, #0, #0x426fc", 0x36000000 | (((0x426F0 - 0x426DC) >> 2) << 5)))
 edits.append(site(0x3B2BC, "bl #0x1c35a0", bl(0x3B2BC, tail_marks["wild_get"])))
 edits.append(site(0x3B3B8, "bl #0x1c35a0", bl(0x3B3B8, tail_marks["wild_apply"])))
 edits.append(site(0x3B3D4, "bl #0x1c35a0", bl(0x3B3D4, tail_marks["wild_get"])))
@@ -742,6 +936,18 @@ edits.append(site(0x3F4E4, "bl #0x1c35a0", bl(0x3F4E4, tail_marks["wild_get"])))
 edits.append(site(0x3B450, "bl #0x1c3550", bl(0x3B450, tail_marks["wild_set"])))
 edits.append(site(0x678710, "stp x20, x19, [sp, #-0x20]!", b(0x678710, tail_marks["wild_text"])))
 edits.append((TAIL, tail_blob))
+edits.append((TRADE_INFO_AT, trade_info_name))
+# Options row 11.
+edits.append(site(0x4276C, "bl #0x45f00", bl(0x4276C, marks["row_alloc"])))
+edits.append(site(0x42804, "ldp x29, x30, [sp, #0x60]", b(0x42804, marks["row_add"])))
+edits.append(site(0x44DD4, "cmp w24, #0xa", b(0x44DD4, marks["row_text"])))
+edits.append(site(0x3F8D8, "cmp w8, #8", b(0x3F8D8, marks["row_toggle"])))
+edits.append(site(0x452D4, "cmp w8, #8", b(0x452D4, marks["row_arrow"])))
+edits.append(site(0x3EBC0, "ldr x10, [x10, w20, sxtw #3]", b(0x3EBC0, marks["row_info"])))
+edits.append(site(0x3B37C, "ldp x29, x30, [sp, #0x10]", b(0x3B37C, marks["row_load"])))
+edits.append(site(0x3B404, "ldr x0, [x8, #8]", b(0x3B404, marks["row_apply"])))
+edits.append(site(0x3F494, "ldr x0, [x19, #8]", b(0x3F494, marks["row_changed"])))
+edits.append(site(0x722BF8, "ldr w8, [x20]", b(0x722BF8, marks["trade_evolution"])))
 
 print("--- tail code")
 names2 = {v: k for k, v in tail_marks.items()}
@@ -759,7 +965,7 @@ out = bytearray(b"PATCH")
 for addr, data in edits:
     if addr == CAVE:
         continue
-    print(f"{addr:08X}  {dec(data[:4], addr)[0]}")
+    print(f"{addr:08X}  {(dec(data[:4], addr) or ['(data)'])[0]}")
     out += (addr + SIZE_HEADER).to_bytes(3, "big") + len(data).to_bytes(2, "big") + data
 out += (CAVE + SIZE_HEADER).to_bytes(3, "big") + len(blob).to_bytes(2, "big") + blob + b"EOF"
 

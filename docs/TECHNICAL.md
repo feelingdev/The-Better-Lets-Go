@@ -22,6 +22,7 @@ Runtime bytes:
 | `0x1EE0F01` | The title demo is running |
 | `0x1EE0F02` | Skip already pressed in this run of the demo |
 | `0x1EE0F04` | 1 when the option is Off |
+| `0x1EE0F05` | The Options screen's working value for Level-Up Trade Evolution |
 | `0x1EE0F08` | Layout playing the logo animation |
 
 ## Encounters
@@ -45,11 +46,22 @@ On early saves, the partner's send-out needs a buddy model the trainer doesn't h
 
 ## The option
 
-- The Options row list at `0x426B4` adds row 3 (Hiragana/Kanji) only in Japanese. `0x426DC` adds it in every other language, and it's reused here.
+- The Options row list at `0x426B4` adds row 3 (Hiragana/Kanji) only in Japanese. In every other language, row 3 is reused here and added at the end of the list (`0x42804`), just above Level-Up Trade Evolution.
 - The choice is bit 31 of the saved settings word (`+0x54`): 0 = On, so existing saves start On. Accessors for this word only use bits 0-19.
 - `0x3B2BC`, `0x3B3B8`, `0x3B3D4`, `0x3F4AC`, `0x3F4E4` and `0x3B450` are redirected so the row uses that bit and never changes the Kanji setting.
 - `0x678710`, the text lookup, returns the row's text for its four labels.
 - The setting is copied to `0x1EE0F04` at each encounter (`0x3057B8`) and scripted event (`0x289B80`), and each patched behaviour checks it.
+
+## Level-Up Trade Evolution
+
+This row is a real new row, ID 11, rather than a reused one. The layout has 10 row slots (`item_button_00`-`09`) that the list recycles as it scrolls, so its length comes from the data.
+
+- `0x4276C` allocates room for two more rows, and `0x42804` adds rows 3 and 11 last through `0x46980`, except in Japanese. The builder's own array holds only 11 IDs.
+- `0x44DD4` (text), `0x3F8D8` (toggle) and `0x452D4` (arrow reaction) stop at ID 10, so each is extended.
+- `0x3EBC0` reads the description's label name from a table at `0x152A028` whose entry 11 is null, so ID 11 gets its own name.
+- The choice is bit 30 of the saved settings word (`+0x54`): 0 = Off. `0x3B37C` loads it to `0x1EE0F05`, `0x3B404` applies it, and `0x3F494` counts it as a change.
+
+`0x722B90` decides whether a Pokémon can evolve for a given record, and its first check is the record's minimum level. Method 4 (level-up) then passes and method 5 (trade) fails. `0x722BF8` makes method 5 pass at Level 50 or above when the bit is set, so it follows the same route as a normal level-up evolution. Trading doesn't use this check, since method 5 always fails there.
 
 ## Intro skip
 
@@ -57,4 +69,4 @@ The running Pikachu is frames 0-500 of the title demo `sd9010_title`. The frame 
 
 The Pokémon logo is a layout animation on its own clock, so `anime_in` is also set to its last frame. The set-frame call clamps anything past the end.
 
-The input is bit 61 of the pad's buttons, which the game maps from + and −.
+The input is the pad's button field (`+0x40`) masked with `0xC0F`: the raw bits for A, B, X, Y, + and −. The field also holds the game's action bits, set by the maps at `0x14C2B0` and `0x14C550`, but those can't be used, because bit 57 also covers L, R, ZL, ZR and the stick clicks.

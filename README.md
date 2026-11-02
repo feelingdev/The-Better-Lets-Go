@@ -40,7 +40,8 @@ All of these can be switched off in-game, except the intro skip.
 | **No battle timer** | The time limit on these battles is removed |
 | **Works on early saves** | Works before "Play with Pikachu" unlocks, and on a brand-new save |
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
-| **Intro skip** | Press **+** or **−** during the running Pikachu to jump to the title screen. Works whatever the option is set to |
+| **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
+| **Intro skip** | Press **+**, **−**, **A**, **B**, **X** or **Y** during the running Pikachu to jump to the title screen. Works whatever the options are set to |
 
 "Presented By" can't be skipped.
 
@@ -70,13 +71,14 @@ The patch ends up here:
 /atmosphere/exefs_patches/the_better_lets_go/C208DB6A4EF4361F28B8402BE0F7CD9A00000000000000000000000000000000.ips
 ```
 
-**To uninstall,** delete the `the_better_lets_go` folder. The option's saved value is one otherwise unused bit, and nothing was seen to use it without the patch, but this hasn't been tested over a long save, so keep your backup.
+**To uninstall,** delete the `the_better_lets_go` folder. Each option's saved value is one otherwise unused bit, and nothing was seen to use them without the patch, but this hasn't been tested over a long save, so keep your backup.
 
 ## How to play
 
 - **Battle:** walk into a wild Pokémon as usual.
 - **Catch:** open **Bag** in battle and pick a Poké Ball.
 - **Turn it off:** go to **Options → Enable Wild Battle**.
+- **Evolve without trading:** turn on **Options → Level-Up Trade Evolution**, then level up at Level 50 or above. A Pokémon at Level 100 can't level up, so it can't evolve this way.
 
 Beating a Pokémon gives no chance to catch it, so **pick a ball before you finish the fight**.
 
@@ -88,8 +90,8 @@ Beating a Pokémon gives no chance to catch it, so **pick a ball before you fini
 
 ## Known limitations
 
-- **Japanese:** the option doesn't appear, so the patch stays On. The option reuses the Hiragana/Kanji row, which Japanese players need.
-- **Other languages:** the option's text is in English in every language for now.
+- **Japanese:** neither option appears, so wild battles stay On and Level-Up Trade Evolution stays Off. "Enable Wild Battle" reuses the Hiragana/Kanji row, which Japanese players need, and the other row's text is English only.
+- **Other languages:** the options' text is in English in every language for now.
 
 ## Testing status
 
@@ -99,7 +101,8 @@ Tested by the author on one Switch. **This build changed how the code is organis
 |---|---|
 | Options row, text and saving the choice | Tested |
 | Catch screen opening on the picked ball | Tested on an earlier build |
-| + and − skipping the running Pikachu | Tested on an earlier build |
+| Level-Up Trade Evolution option and evolving at Level 50 | **Not tested** |
+| +, −, A, B, X and Y skipping the running Pikachu | **Not tested** (+ and − were, on an earlier build) |
 | Timer, EXP on a win, evolution, early saves | Tested on an older version of the project |
 | Option Off restoring the original mechanic | Tested |
 | No catch screen after a win, catch EXP, ball count | Tested |
