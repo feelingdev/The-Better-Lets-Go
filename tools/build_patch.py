@@ -796,6 +796,7 @@ emit(b(pc(), 0x722BFC))
 # button, so every rule for when the menu can open applies. Where the menu would open, the map opens instead.
 # On a single sideways Joy-Con, Up already is the menu button (see the map at 0x14C2B0), so the menu wins there.
 SKY_DASH_UP = FLAG + 7    # Up was what asked for the menu
+SKY_DASH_MAP = FLAG + 3   # the event being opened should go straight to its town map
 SKY_DASH_FLAG = label_hash("FSYS_HIDEN_OPEN_SORAWOTOBU")
 assert SKY_DASH_FLAG == 0x15C149D11F0E8188
 UP_BIT = 13               # raw D-pad Up, pad +0x40
@@ -841,15 +842,16 @@ code[no_slot_a] = cbz(CAVE + no_slot_a * 4, no_at, 0, wide=True)
 code[no_slot_b] = cbz(CAVE + no_slot_b * 4, no_at, 0, wide=True)
 code[no_slot_c] = 0x36000000 | (((no_at - (CAVE + no_slot_c * 4)) >> 2) << 5)
 
-# Where the menu opens: the game's own town map event if Up asked, the same call its scripts use.
+# Where the menu opens: if Up asked, the game's other route into its menu event, which flies by itself (mode 1). The script
+# command's town map event can't be used: it leaves the map's "can fly" byte (+0x20, read at 0x984D54) at 0 and ignores the result.
 mark("menu_open")
 emit(adrp(pc(), 9, SKY_DASH_UP))
 emit(flag_ldrb(10, 9, SKY_DASH_UP))
 open_menu_slot = len(code)
 emit(0)                           # cbz w10, menu
 emit(flag_strb(31, 9, SKY_DASH_UP))
-emit(bl(pc(), 0x19E2C0))
-emit(b(pc(), 0x2F8D74))
+emit(flag_strb(10, 9, SKY_DASH_MAP))
+emit(b(pc(), 0x2F8D64))
 code[open_menu_slot] = cbz(CAVE + open_menu_slot * 4, pc(), 10)
 emit(original(0x2F8D10))
 emit(b(pc(), 0x2F8D14))
@@ -986,6 +988,38 @@ tail[orig_slot] = cbz(at, orig, 11, wide=True)
 at = TAIL + match_slot * 4
 tail[match_slot] = 0x54000000 | (((match - at) >> 2) << 5)            # b.eq match
 
+# Menu event, state 2 (opens the menu): when Up opened the event, record "town map" as the choice and take the map's state.
+tmark("sky_dash_state")
+tail.append(adrp(tpc(), 9, SKY_DASH_MAP))
+tail.append(flag_ldrb(10, 9, SKY_DASH_MAP))
+sky_menu_slot = len(tail)
+tail.append(0)                    # cbz w10, the menu
+tail.append(0xB900A26A)           # str w10, [x19, #0xa0]
+tail.append(b(tpc(), 0x28007C))
+tail[sky_menu_slot] = cbz(TAIL + sky_menu_slot * 4, tpc(), 10)
+tail.append(original(0x27FFF8))
+tail.append(b(tpc(), 0x27FFFC))
+
+# Menu event, state 5 (the map has closed). A destination flies as usual. Backing out would reopen the menu, so when Up opened
+# the event, leave as if the menu had closed with nothing chosen: 5 is the constructor's default, and state 6 ignores it.
+tmark("sky_dash_back")
+tail.append(adrp(tpc(), 9, SKY_DASH_MAP))
+tail.append(flag_ldrb(10, 9, SKY_DASH_MAP))
+tail.append(flag_strb(31, 9, SKY_DASH_MAP))
+tail.append(original(0x2802EC))
+tail.append(0x7100051F)           # cmp w8, #1
+sky_chosen_slot = len(tail)
+tail.append(0)                    # b.ne not chosen
+tail.append(b(tpc(), 0x2802F8))
+tail[sky_chosen_slot] = 0x54000001 | (((tpc() - (TAIL + sky_chosen_slot * 4)) >> 2) << 5)
+sky_ours_slot = len(tail)
+tail.append(0)                    # cbnz w10, ours
+tail.append(b(tpc(), 0x2803A0))
+tail[sky_ours_slot] = cbz(TAIL + sky_ours_slot * 4, tpc(), 10, nz=True)
+tail.append(0x528000A9)           # mov w9, #5
+tail.append(0xB900A269)           # str w9, [x19, #0xa0]
+tail.append(b(tpc(), 0x2803B0))
+
 table_at = tpc()
 at = TAIL + table_slot * 4
 delta = table_at - at
@@ -1033,6 +1067,8 @@ edits.append(site(0x722BF8, "ldr w8, [x20]", b(0x722BF8, marks["trade_evolution"
 # D-pad Up.
 edits.append(site(0x2F810C, "bl #0x13f540", bl(0x2F810C, marks["menu_button"])))
 edits.append(site(0x2F8D10, "ldr x1, [x19]", b(0x2F8D10, marks["menu_open"])))
+edits.append(site(0x27FFF8, "mov x20, x19", b(0x27FFF8, tail_marks["sky_dash_state"])))
+edits.append(site(0x2802EC, "ldr w8, [x19, #0x218]", b(0x2802EC, tail_marks["sky_dash_back"])))
 
 print("--- tail code")
 names2 = {v: k for k, v in tail_marks.items()}

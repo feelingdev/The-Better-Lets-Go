@@ -14,7 +14,7 @@ The AI can't run the game, so every result below comes from the owner testing on
 
 ## About
 
-A patch for **Pokémon: Let's Go, Pikachu!** on modded Nintendo Switch. It lets you battle wild Pokémon, with EXP and evolution, and catch them when you choose.
+A patch for **Pokémon: Let's Go, Pikachu!** on modded Nintendo Switch. It lets you battle wild Pokémon, with EXP and evolution, and catch them when you choose. It also adds level-up trade evolutions, Sky Dash on D-pad Up and an intro skip, and its options are translated into every language the game has, including Japanese.
 
 > **Status: early pre-release, not fully tested.** Back up your saves. See [Testing status](#testing-status).
 
@@ -42,7 +42,7 @@ All of these can be switched off in-game, except the intro skip and Sky Dash on 
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
 | **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
 | **Every game language** | Both options appear and are translated in all the game's languages, including Japanese in kana and kanji |
-| **Sky Dash on D-pad Up** | Press **Up** in the overworld to open the town map and choose Sky Dash, once you've unlocked it. Works whatever the options are set to. Not on a single Joy-Con, where Up opens the menu |
+| **Sky Dash on D-pad Up** | Press **Up** in the overworld to open the town map and pick a place to fly to, once you've unlocked Sky Dash. **B** takes you back to the overworld. Works whatever the options are set to. Not on a single Joy-Con, where Up opens the menu |
 | **Intro skip** | Press **+**, **−**, **A**, **B**, **X** or **Y** during the running Pikachu to jump to the title screen. Works whatever the options are set to |
 
 "Presented By" can't be skipped.
@@ -80,6 +80,7 @@ The patch ends up here:
 - **Battle:** walk into a wild Pokémon as usual.
 - **Catch:** open **Bag** in battle and pick a Poké Ball.
 - **Turn it off:** go to **Options → Enable Wild Battle**.
+- **Fly:** press **Up** in the overworld, then pick a place on the map with **A**.
 - **Evolve without trading:** turn on **Options → Level-Up Trade Evolution**, then level up at Level 50 or above. A Pokémon at Level 100 can't level up, so it can't evolve this way.
 
 Beating a Pokémon gives no chance to catch it, so **pick a ball before you finish the fight**. Snorlax, Legendaries and other scripted wild fights are different: they play as in the original game, with no balls in the battle Bag, and you catch them after you win.

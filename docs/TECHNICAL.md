@@ -22,6 +22,7 @@ Runtime bytes:
 | `0x1EE0F00` | Item ID of the ball picked from the Bag; nonzero means this catch came from a ball |
 | `0x1EE0F01` | The title demo is running |
 | `0x1EE0F02` | Skip already pressed in this run of the demo |
+| `0x1EE0F03` | The menu event being opened should go straight to its town map |
 | `0x1EE0F04` | 1 when the option is Off |
 | `0x1EE0F05` | The Options screen's working value for Level-Up Trade Evolution |
 | `0x1EE0F06` | The Options screen's working value for Enable Wild Battle |
@@ -78,7 +79,10 @@ This is row ID 11. The layout has 10 row slots (`item_button_00`-`09`) that the 
 ## Sky Dash on D-pad Up
 
 - `0x2F810C` is the overworld's test for the menu button. It's replaced so that raw D-pad Up (bit 13 of pad `+0x40`) counts as well, if the flag `FSYS_HIDEN_OPEN_SORAWOTOBU` is set, and `0x1EE0F07` records that Up was the reason. Every rule the game then applies to opening the menu still applies.
-- `0x2F8D10` is where the menu opens. With `0x1EE0F07` set, it calls `0x19E2C0` instead, the function behind the script command `ExecuteShowTownMapEvent_`.
+- `0x2F8D10` is where the menu opens. With `0x1EE0F07` set, it sets `0x1EE0F03` and takes the game's other route into its menu event (`0x2F8D64`, `0x27EF50` with mode 1), which flies by itself once a destination comes back.
+- `0x27FFF8` is that event's state 2, which opens the menu. With `0x1EE0F03` set, it records the town map as the choice (`+0xA0 = 1`) and goes to state 4, which opens the map with its "can fly" byte set.
+- `0x2802EC` is state 5, after the map closes. A destination flies as usual. Backing out would reopen the menu, so with `0x1EE0F03` set it stores `+0xA0 = 5`, the constructor's "nothing chosen", and leaves through the normal close at `0x2803B0`.
+- The script command `ExecuteShowTownMapEvent_` (`0x19E2C0`) can't be used for this. It leaves the map's "can fly" byte (`+0x20`, read at `0x984D54`) at 0, so A does nothing, and its event ignores the map's result.
 - The menu button's own press wins. On a single sideways Joy-Con, Up already sets that button's action bit (the map at `0x14C2B0`), so it still opens the menu. Two-handed setups map Up to no action (the table at `0xF49E04`).
 
 ## Intro skip
