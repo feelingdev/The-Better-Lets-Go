@@ -41,6 +41,7 @@ All of these can be switched off in-game, except the intro skip.
 | **Works on early saves** | Works before "Play with Pikachu" unlocks, and on a brand-new save |
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
 | **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
+| **Every game language** | Both options appear and are translated in all the game's languages, including Japanese in kana and kanji |
 | **Intro skip** | Press **+**, **−**, **A**, **B**, **X** or **Y** during the running Pikachu to jump to the title screen. Works whatever the options are set to |
 
 "Presented By" can't be skipped.
@@ -90,8 +91,7 @@ Beating a Pokémon gives no chance to catch it, so **pick a ball before you fini
 
 ## Known limitations
 
-- **Japanese:** neither option appears, so wild battles stay On and Level-Up Trade Evolution stays Off. "Enable Wild Battle" reuses the Hiragana/Kanji row, which Japanese players need, and the other row's text is English only.
-- **Other languages:** the options' text is in English in every language for now.
+- **Translations:** the options' text is translated by AI into every language the game has, including both Japanese modes, using the game's own terms and Pokémon names. It hasn't been checked by native speakers, so corrections are very welcome. They live in [`tools/option_text.py`](tools/option_text.py).
 
 ## Testing status
 

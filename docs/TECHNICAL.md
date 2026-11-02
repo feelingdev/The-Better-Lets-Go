@@ -4,14 +4,15 @@ These are notes on `tools/build_patch.py`, from static analysis of `main` in Let
 
 ## Format
 
-One IPS file, named after the build ID, in `atmosphere/exefs_patches/<folder>/`. Atmosphère applies it when the game loads.
+One IPS32 file, named after the build ID, in `atmosphere/exefs_patches/<folder>/`. Atmosphère applies it when the game loads. It's IPS32 rather than IPS because the option text is past what 3-byte offsets can reach.
 
 ## Where the code lives
 
 | Range | Use | Why it's safe |
 |---|---|---|
 | `0x6F6830-0x6F70F0` | Main code | Protobuf `Tokenizer::ConsumeString` and `ConsumeNumber`, entered only from `Tokenizer::Next` during text-format parsing, which normal play doesn't appear to use. If it ever ran, the game would crash |
-| `0xD32BB0-0xD33000` | Option code and text | Zero padding after the text section |
+| `0xD32BB0-0xD33000` | Option text lookup and label names | Zero padding after the text section |
+| `0x1526180-0x1527000` | Option text in every language | Zero padding after the read-only section |
 | `0x1EE0F00` onward | Runtime state | Padding past the end of `.bss`, in the same mapped page |
 
 Runtime bytes:
@@ -23,6 +24,7 @@ Runtime bytes:
 | `0x1EE0F02` | Skip already pressed in this run of the demo |
 | `0x1EE0F04` | 1 when the option is Off |
 | `0x1EE0F05` | The Options screen's working value for Level-Up Trade Evolution |
+| `0x1EE0F06` | The Options screen's working value for Enable Wild Battle |
 | `0x1EE0F08` | Layout playing the logo animation |
 
 ## Encounters
@@ -46,20 +48,28 @@ On early saves, the partner's send-out needs a buddy model the trainer doesn't h
 
 ## The option
 
-- The Options row list at `0x426B4` adds row 3 (Hiragana/Kanji) only in Japanese. In every other language, row 3 is reused here and added at the end of the list (`0x42804`), just above Level-Up Trade Evolution.
+- "Enable Wild Battle" is its own row, ID 12, in every language. The Hiragana/Kanji row is left alone.
 - The choice is bit 31 of the saved settings word (`+0x54`): 0 = On, so existing saves start On. Accessors for this word only use bits 0-19.
-- `0x3B2BC`, `0x3B3B8`, `0x3B3D4`, `0x3F4AC`, `0x3F4E4` and `0x3B450` are redirected so the row uses that bit and never changes the Kanji setting.
-- `0x678710`, the text lookup, returns the row's text for its four labels.
 - The setting is copied to `0x1EE0F04` at each encounter (`0x3057B8`) and scripted event (`0x289B80`), and each patched behaviour checks it.
+
+## The new Options rows
+
+Rows 11 and 12 are added last in every language, so Japanese shows 13 rows and the others 12.
+
+- `0x4276C` allocates room for two more rows, and `0x42804` adds them through `0x46980`. The builder's own array holds only 11 IDs.
+- `0x44DD4` (text), `0x3F8D8` (toggle) and `0x452D4` (arrow reaction) stop at ID 10, so each is extended.
+- `0x3EBC0` reads the description's label name from a table at `0x152A028` whose entry 11 is null, so these rows bring their own names.
+- `0x3B37C` loads both choices to the working bytes, `0x3B404` applies them, and `0x3F494` counts them as a change.
+
+## Option text
+
+- `0x678710`, the text lookup, watches for this patch's four labels: each row's title and description. Anything else goes to the game as usual.
+- It picks the language from the word at `0x1614B34`, the message folder the game is using (`0x1B31E0`): 0 Japanese kana, 1 Japanese kanji, 2 English, 3 French, 4 Italian, 5 German, 6 Spanish, 7 Korean, 8 Simplified Chinese, 9 Traditional Chinese. Anything else falls back to English.
+- The strings come from `tools/option_text.py`. On and Off use Movie Skipping's own labels, already translated by the game.
 
 ## Level-Up Trade Evolution
 
-This row is a real new row, ID 11, rather than a reused one. The layout has 10 row slots (`item_button_00`-`09`) that the list recycles as it scrolls, so its length comes from the data.
-
-- `0x4276C` allocates room for two more rows, and `0x42804` adds rows 3 and 11 last through `0x46980`, except in Japanese. The builder's own array holds only 11 IDs.
-- `0x44DD4` (text), `0x3F8D8` (toggle) and `0x452D4` (arrow reaction) stop at ID 10, so each is extended.
-- `0x3EBC0` reads the description's label name from a table at `0x152A028` whose entry 11 is null, so ID 11 gets its own name.
-- The choice is bit 30 of the saved settings word (`+0x54`): 0 = Off. `0x3B37C` loads it to `0x1EE0F05`, `0x3B404` applies it, and `0x3F494` counts it as a change.
+This is row ID 11. The layout has 10 row slots (`item_button_00`-`09`) that the list recycles as it scrolls, so its length comes from the data. The choice is bit 30 of the saved settings word (`+0x54`): 0 = Off.
 
 `0x722B90` decides whether a Pokémon can evolve for a given record, and its first check is the record's minimum level. Method 4 (level-up) then passes and method 5 (trade) fails. `0x722BF8` makes method 5 pass at Level 50 or above when the bit is set, so it follows the same route as a normal level-up evolution. Trading doesn't use this check, since method 5 always fails there.
 

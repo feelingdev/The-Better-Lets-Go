@@ -6,6 +6,8 @@ import sys
 
 from capstone import CS_ARCH_ARM64, CS_MODE_ARM, Cs
 
+import option_text
+
 image = open(sys.argv[1], "rb").read()[0x100:]
 md = Cs(CS_ARCH_ARM64, CS_MODE_ARM)
 
@@ -547,16 +549,17 @@ emit(struct.unpack_from("<I", image, 0x319EB4)[0])  # the original two instructi
 emit(struct.unpack_from("<I", image, 0x319EB8)[0])
 emit(b(pc(), 0x319EBC))
 
-# --- Options row 11, "Level-Up Trade Evolution". Not on Japanese, because its text is English only.
-# The choice is bit 30 of the saved settings word (+0x54): 0 = off, so existing saves start off.
-# TRADE_EVO holds the screen's working value, loaded and applied alongside the game's own option values.
+# --- Options rows 12 "Enable Wild Battle" and 11 "Level-Up Trade Evolution", last in the list in every language.
+# Saved as bits of the settings word (+0x54): bit 31 = wild battles off (0 = on), bit 30 = trade evolution on (0 = off),
+# so existing saves start with wild battles on and trade evolution off. The bytes below are the screen's working values.
 TRADE_EVO = FLAG + 5
-TRADE_INFO_AT = 0xD32FE0  # the row's description label name, at the end of the padding used by the text below
+WILD_VALUE = FLAG + 6
+WILD_INFO_AT = 0xD32FC0   # the rows' description label names, at the end of the padding used by the text table below
+TRADE_INFO_AT = 0xD32FE0
+WILD_INFO_NAME = "tbl_wild_battle_info"
 TRADE_INFO_NAME = "tbl_trade_evo_info"
-LANG_GOT = 0x15FAEF0
-ROW_ID = 11
-LABEL_ON = 0xB47AA6D4ACE0ED81
-LABEL_OFF = 0xB47AA3D4ACE0E868
+ROW_TRADE = 11
+ROW_WILD = 12
 
 
 def label_hash(name):
@@ -568,8 +571,13 @@ def label_hash(name):
 
 
 assert label_hash("msg_option_02_info") == 0x72DC9B7C22B155DE
+WILD_TITLE = label_hash("tbl_wild_battle_title")
+WILD_INFO = label_hash(WILD_INFO_NAME)
 TRADE_TITLE = label_hash("tbl_trade_evo_title")
 TRADE_INFO = label_hash(TRADE_INFO_NAME)
+# Movie Skipping's value text: translated, and neutral enough for these rows in every language.
+LABEL_ON = label_hash("msg_option_10_01")
+LABEL_OFF = label_hash("msg_option_10_02")
 
 
 def mov_x1(value):
@@ -585,18 +593,25 @@ def b_cond(src, dst, cond):
 EQ = 0
 
 
-def row_id_check(compare_word, original_word, resume):
-    """Compare against our row; anything else runs the original compare and goes back. Returns the b.eq slot."""
-    emit(compare_word)
-    slot = len(code)
+def row_id_check(compare_wild, compare_trade, original_word, resume):
+    """Compare against each of our rows; anything else runs the original instruction and goes back. Returns the b.eq slots."""
+    emit(compare_wild)
+    wild = len(code)
+    emit(0)                       # b.eq, patched by the caller
+    emit(compare_trade)
+    trade = len(code)
     emit(0)                       # b.eq, patched by the caller
     emit(original_word)
     emit(b(pc(), resume))
-    return slot
+    return wild, trade
 
 
 def patch_eq(slot):
     code[slot] = b_cond(CAVE + slot * 4, pc(), EQ)
+
+
+def original(addr):
+    return struct.unpack_from("<I", image, addr)[0]
 
 
 # List allocation: room for two more rows, so adding ours doesn't need the vector to grow. The caller's count is put back.
@@ -616,100 +631,128 @@ emit(0xA8C27BFD)                  # ldp x29, x30, [sp], #0x20
 emit(RET)
 
 # End of the row builder: add our two rows last, the way its own loop adds the others.
-# The builder itself keeps row 3 for Japanese only, so "Enable Wild Battle" (row 3 elsewhere) is added here.
 mark("row_add")
-emit(adrp(pc(), 9, LANG_GOT))
-emit(ldr(9, 9, LANG_GOT & 0xFFF))
-emit(ldr(9, 9, 0))
-emit(0x39414129)                  # ldrb w9, [x9, #0x50]
-emit(0x7100053F)                  # cmp w9, #1
-add_skip = len(code)
-emit(0)                           # b.eq done
-for row in (3, ROW_ID):
+for row in (ROW_WILD, ROW_TRADE):
     emit(ldr(8, 19, 0x278))
     emit(0x91028100)              # add x0, x8, #0xa0
     emit(0xD100A3A1)              # sub x1, x29, #0x28
     emit(0x52800009 | (row << 5)) # mov w9, #row
-    emit(struct.unpack_from("<I", image, 0x427E8)[0])   # stur w9, [x29, #-0x28]
-    emit(struct.unpack_from("<I", image, 0x427EC)[0])   # sturb wzr, [x29, #-0x24]
+    emit(original(0x427E8))       # stur w9, [x29, #-0x28]
+    emit(original(0x427EC))       # sturb wzr, [x29, #-0x24]
     emit(bl(pc(), 0x46980))
-patch_eq(add_skip)
-emit(struct.unpack_from("<I", image, 0x42804)[0])
+emit(original(0x42804))
 emit(b(pc(), 0x42808))
+
+
+def row_text_body(title, value_addr, value_when_on):
+    mov_x1(title)
+    emit(0xAA1303E0)              # mov x0, x19
+    emit(0xAA1503E2)              # mov x2, x21
+    emit(bl(pc(), 0x44130))
+    emit(adrp(pc(), 8, value_addr))
+    emit(flag_ldrb(8, 8, value_addr))
+    emit(cbz(pc(), pc() + 24, 8, nz=True))
+    mov_x1(LABEL_OFF if value_when_on else LABEL_ON)
+    emit(b(pc(), pc() + 20))
+    mov_x1(LABEL_ON if value_when_on else LABEL_OFF)
+    emit(b(pc(), 0x45164))
+
 
 # Row text: title and current value.
 mark("row_text")
-slot = row_id_check(0x71002F1F, struct.unpack_from("<I", image, 0x44DD4)[0], 0x44DD8)   # cmp w24, #11
-patch_eq(slot)
-mov_x1(TRADE_TITLE)
-emit(0xAA1303E0)                  # mov x0, x19
-emit(0xAA1503E2)                  # mov x2, x21
-emit(bl(pc(), 0x44130))
-emit(adrp(pc(), 8, TRADE_EVO))
-emit(flag_ldrb(8, 8, TRADE_EVO))
-emit(cbz(pc(), pc() + 24, 8, nz=True))   # value 1 = On
-mov_x1(LABEL_OFF)
-emit(b(pc(), pc() + 20))
-mov_x1(LABEL_ON)
-emit(b(pc(), 0x45164))
+wild_slot, trade_slot = row_id_check(0x7100331F, 0x71002F1F, original(0x44DD4), 0x44DD8)   # cmp w24, #12 / #11
+patch_eq(wild_slot)
+row_text_body(WILD_TITLE, WILD_VALUE, 0)
+patch_eq(trade_slot)
+row_text_body(TRADE_TITLE, TRADE_EVO, 1)
 
-# Left or right on the row: flip it.
+
+def row_toggle_body(value_addr):
+    emit(adrp(pc(), 8, value_addr))
+    emit(flag_ldrb(9, 8, value_addr))
+    emit(0x52000129)              # eor w9, w9, #1
+    emit(flag_strb(9, 8, value_addr))
+    emit(b(pc(), 0x3FAB4))
+
+
+# Left or right on a row: flip it.
 mark("row_toggle")
-slot = row_id_check(0x7100251F, struct.unpack_from("<I", image, 0x3F8D8)[0], 0x3F8DC)   # cmp w8, #9 (row - 2)
-patch_eq(slot)
-emit(adrp(pc(), 8, TRADE_EVO))
-emit(flag_ldrb(9, 8, TRADE_EVO))
-emit(0x52000129)                  # eor w9, w9, #1
-emit(flag_strb(9, 8, TRADE_EVO))
-emit(b(pc(), 0x3FAB4))
+wild_slot, trade_slot = row_id_check(0x7100291F, 0x7100251F, original(0x3F8D8), 0x3F8DC)   # cmp w8, #10 / #9 (row - 2)
+patch_eq(wild_slot)
+row_toggle_body(WILD_VALUE)
+patch_eq(trade_slot)
+row_toggle_body(TRADE_EVO)
+
+
+def row_arrow_body(value_addr):
+    emit(adrp(pc(), 8, value_addr))
+    emit(flag_ldrb(8, 8, value_addr))
+    emit(0x52800029)              # mov w9, #1
+    emit(0x37F80042)              # tbnz w2, #31, over the next branch
+    emit(b(pc(), 0x45388))
+    emit(b(pc(), 0x4536C))
+
 
 # The arrow reaction after a change, as the other On/Off rows do it.
 mark("row_arrow")
-slot = row_id_check(0x7100251F, struct.unpack_from("<I", image, 0x452D4)[0], 0x452D8)   # cmp w8, #9 (row - 2)
-patch_eq(slot)
-emit(adrp(pc(), 8, TRADE_EVO))
-emit(flag_ldrb(8, 8, TRADE_EVO))
-emit(0x52800029)                  # mov w9, #1
-emit(0x37F80042)                  # tbnz w2, #31, over the next branch
-emit(b(pc(), 0x45388))
-emit(b(pc(), 0x4536C))
+wild_slot, trade_slot = row_id_check(0x7100291F, 0x7100251F, original(0x452D4), 0x452D8)   # cmp w8, #10 / #9 (row - 2)
+patch_eq(wild_slot)
+row_arrow_body(WILD_VALUE)
+patch_eq(trade_slot)
+row_arrow_body(TRADE_EVO)
 
-# Description: the game's label name table has no entry 11 (it's null), so give our row its own name.
+
+def row_info_body(name_addr):
+    emit(adrp(pc(), 10, name_addr))
+    emit(0x91000000 | ((name_addr & 0xFFF) << 10) | (10 << 5) | 10)   # add x10, x10, #lo
+    emit(b(pc(), 0x3EBC4))
+
+
+# Description: the game's label name table stops at row 10 (entry 11 is null), so our rows bring their own names.
 mark("row_info")
-slot = row_id_check(0x71002E9F, struct.unpack_from("<I", image, 0x3EBC0)[0], 0x3EBC4)   # cmp w20, #11
-patch_eq(slot)
-emit(adrp(pc(), 10, TRADE_INFO_AT))
-emit(0x91000000 | ((TRADE_INFO_AT & 0xFFF) << 10) | (10 << 5) | 10)   # add x10, x10, #lo
-emit(b(pc(), 0x3EBC4))
+wild_slot, trade_slot = row_id_check(0x7100329F, 0x71002E9F, original(0x3EBC0), 0x3EBC4)   # cmp w20, #12 / #11
+patch_eq(wild_slot)
+row_info_body(WILD_INFO_AT)
+patch_eq(trade_slot)
+row_info_body(TRADE_INFO_AT)
 
-# Screen opens: working value from the save.
+# Screen opens: working values from the save.
 mark("row_load")
 emit(ldr(9, 8, 8))
 emit(0xB9405529)                  # ldr w9, [x9, #0x54]
-emit(0x531E7929)                  # ubfx w9, w9, #30, #1
 emit(adrp(pc(), 10, TRADE_EVO))
-emit(flag_strb(9, 10, TRADE_EVO))
-emit(struct.unpack_from("<I", image, 0x3B37C)[0])
+emit(0x531E792B)                  # ubfx w11, w9, #30, #1
+emit(flag_strb(11, 10, TRADE_EVO))
+emit(0x531F7D29)                  # lsr w9, w9, #31
+emit(flag_strb(9, 10, WILD_VALUE))
+emit(original(0x3B37C))
 emit(b(pc(), 0x3B380))
 
-# Settings applied: working value to the save.
+# Settings applied: working values to the save.
 mark("row_apply")
-emit(struct.unpack_from("<I", image, 0x3B404)[0])   # ldr x0, [x8, #8]
+emit(original(0x3B404))           # ldr x0, [x8, #8]
 emit(0xB9405409)                  # ldr w9, [x0, #0x54]
 emit(adrp(pc(), 10, TRADE_EVO))
-emit(flag_ldrb(10, 10, TRADE_EVO))
-emit(0x33020149)                  # bfi w9, w10, #30, #1
+emit(flag_ldrb(11, 10, TRADE_EVO))
+emit(0x33020169)                  # bfi w9, w11, #30, #1
+emit(flag_ldrb(11, 10, WILD_VALUE))
+emit(0x33010169)                  # bfi w9, w11, #31, #1
 emit(0xB9005409)                  # str w9, [x0, #0x54]
 emit(b(pc(), 0x3B408))
 
-# Changed check: our value counts too, or changing only this row wouldn't be saved.
+# Changed check: our values count too, or changing only these rows wouldn't be saved.
 mark("row_changed")
-emit(struct.unpack_from("<I", image, 0x3F494)[0])   # ldr x0, [x19, #8]
+emit(original(0x3F494))           # ldr x0, [x19, #8]
 emit(0xB9405409)                  # ldr w9, [x0, #0x54]
-emit(0x531E7929)                  # ubfx w9, w9, #30, #1
 emit(adrp(pc(), 10, TRADE_EVO))
-emit(flag_ldrb(10, 10, TRADE_EVO))
-emit(0x6B0A013F)                  # cmp w9, w10
+emit(0x531E792B)                  # ubfx w11, w9, #30, #1
+emit(flag_ldrb(12, 10, TRADE_EVO))
+emit(0x6B0C017F)                  # cmp w11, w12
+emit(b_cond(pc(), pc() + 8, EQ))
+emit(b(pc(), 0x3F4D0))            # changed
+emit(0x531F7D29)                  # lsr w9, w9, #31
+emit(flag_ldrb(12, 10, WILD_VALUE))
+emit(0x6B0C013F)                  # cmp w9, w12
 emit(b_cond(pc(), pc() + 8, EQ))
 emit(b(pc(), 0x3F4D0))            # changed
 emit(b(pc(), 0x3F498))
@@ -720,10 +763,10 @@ TRADE_EVO_LEVEL = 50
 mark("trade_evolution")
 emit(struct.unpack_from("<I", image, 0x722BF8)[0])  # ldr w8, [x20]
 emit(0x7100151F)                  # cmp w8, #5
-trade_slot = len(code)
+evo_slot = len(code)
 emit(0)                           # b.eq check
 emit(b(pc(), 0x722BFC))
-patch_eq(trade_slot)
+patch_eq(evo_slot)
 trade_skips = []
 read_setting(9, trade_skips)
 emit(0xB9405529)                  # ldr w9, [x9, #0x54]
@@ -791,11 +834,15 @@ edits.append(site(0x9D3860, "str w20, [x8, #0x508]", b(0x9D3860, marks["result_a
 edits.append(site(0x9DA378, "str w0, [x8, #0x508]", b(0x9DA378, marks["result_b"])))
 edits.append((CAVE, blob))
 
-# --- Options row "Enable Wild Battle": lives in the padding after the code section. Not on Japanese, which needs this row.
-# The choice is bit 31 of the saved settings word (+0x54): 0 = on, so existing saves start on.
+# --- Option text. The lookup lives in the padding after the code section. The strings, one set per message folder,
+# are in the read-only padding after the build ID note, which is why the patch uses IPS32.
 TAIL = 0xD32BB0
 TAIL_END = 0xD33000
+RO_TEXT = 0x1526180
+RO_END = 0x1527000
 assert not any(image[0xD32BA8:TAIL_END])
+assert not any(image[0x152617C:RO_END])
+LANG_INDEX = 0x1614B34    # the active message folder, as set at 0x1B31E0 (Japanese kana 0, kanji 1, others 2-9)
 tail = []
 tail_marks = {}
 
@@ -808,56 +855,14 @@ def tmark(name):
     tail_marks[name] = tpc()
 
 
-def not_japanese_else(target):
-    """Falls through on any language but Japanese; on Japanese, branches to the original function."""
-    tail.append(adrp(tpc(), 9, LANG_GOT))
-    tail.append(ldr(9, 9, LANG_GOT & 0xFFF))
-    tail.append(ldr(9, 9, 0))
-    tail.append(0x39414129)       # ldrb w9, [x9, #0x50]
-    tail.append(0x7100053F)       # cmp w9, #1
-    at = tpc()
-    tail.append(0x54000041)       # b.ne, over the branch
-    tail.append(b(at + 4, target))
-
-
-# x0 = save settings. Read our bit where the screen asks for its Characters value.
-tmark("wild_get")
-not_japanese_else(0x1C35A0)
-tail.append(0xB9405400)           # ldr w0, [x0, #0x54]
-tail.append(0x531F7C00)           # lsr w0, w0, #31
-tail.append(RET)
-
-# Apply step, x0 = save settings, x8 = screen values: store our bit and report no change, so no language work runs.
-tmark("wild_apply")
-not_japanese_else(0x1C35A0)
-tail.append(0x39405509)           # ldrb w9, [x8, #0x15]
-tail.append(0xB940540A)           # ldr w10, [x0, #0x54]
-tail.append(0x3301012A)           # bfi w10, w9, #31, #1
-tail.append(0xB900540A)           # str w10, [x0, #0x54]
-tail.append(0x2A0903E0)           # mov w0, w9
-tail.append(RET)
-
-# The Characters setter is skipped.
-tmark("wild_set")
-not_japanese_else(0x1C3550)
-tail.append(RET)
-
-# Text lookup, x1 = &label hash, x2 = output. Our four labels are written directly.
-tmark("wild_text")
-not_japanese_else_at = tpc()
-tail.append(adrp(tpc(), 9, LANG_GOT))
-tail.append(ldr(9, 9, LANG_GOT & 0xFFF))
-tail.append(ldr(9, 9, 0))
-tail.append(0x39414129)           # ldrb w9, [x9, #0x50]
-tail.append(0x7100053F)           # cmp w9, #1
-orig_slot_a = len(tail)
-tail.append(0)                    # b.eq original
+# Text lookup, x1 = &label hash, x2 = output. Our four labels are written directly, in the current language.
+tmark("option_text")
 tail.append(ldr(9, 1, 0))
 table_slot = len(tail)
 tail.append(0)                    # adr x10, table
 loop_at = tpc()
 tail.append(ldr(11, 10, 0))
-orig_slot_b = len(tail)
+orig_slot = len(tail)
 tail.append(0)                    # cbz x11, original
 tail.append(0xEB09017F)           # cmp x11, x9
 match_slot = len(tail)
@@ -870,9 +875,19 @@ tail.append(0xA90153F3)           # stp x19, x20, [sp, #0x10]
 tail.append(0xF90013F5)           # str x21, [sp, #0x20]
 tail.append(0x910003FD)           # mov x29, sp
 tail.append(0xAA0203F3)           # mov x19, x2
-tail.append(0xB9400954)           # ldr w20, [x10, #8]
-tail.append(0x8B140154)           # add x20, x10, x20
-tail.append(0xB9400D55)           # ldr w21, [x10, #0xc]
+tail.append(0xB9400949)           # ldr w9, [x10, #8]: which string
+tail.append(adrp(tpc(), 11, LANG_INDEX))
+tail.append(0xB9400000 | (((LANG_INDEX & 0xFFF) // 4) << 10) | (11 << 5) | 11)   # ldr w11, [x11, #lo]
+tail.append(0x7100257F)           # cmp w11, #9
+tail.append(0x54000049)           # b.ls, over the next instruction
+tail.append(0x5280004B)           # mov w11, #2: English
+tail.append(0x0B0B0929)           # add w9, w9, w11, lsl #2
+tail.append(adrp(tpc(), 12, RO_TEXT))
+tail.append(0x91000000 | ((RO_TEXT & 0xFFF) << 10) | (12 << 5) | 12)   # add x12, x12, #lo
+tail.append(0x8B09098D)           # add x13, x12, x9, lsl #2
+tail.append(0x794001B4)           # ldrh w20, [x13]: offset
+tail.append(0x794005B5)           # ldrh w21, [x13, #2]: characters
+tail.append(0x8B140194)           # add x20, x12, x20
 tail.append(0xAA1303E0)           # mov x0, x19
 tail.append(bl(tpc(), 0x3A860))
 tail.append(0xAA1303E0)           # mov x0, x19
@@ -894,50 +909,45 @@ orig = tpc()
 tail.append(struct.unpack_from("<I", image, 0x678710)[0])
 tail.append(b(tpc(), 0x678714))
 
-at = TAIL + orig_slot_a * 4
-tail[orig_slot_a] = 0x54000000 | (((orig - at) >> 2) << 5)            # b.eq original
-at = TAIL + orig_slot_b * 4
-tail[orig_slot_b] = cbz(at, orig, 11, wide=True)
+at = TAIL + orig_slot * 4
+tail[orig_slot] = cbz(at, orig, 11, wide=True)
 at = TAIL + match_slot * 4
 tail[match_slot] = 0x54000000 | (((match - at) >> 2) << 5)            # b.eq match
 
-STRINGS = [
-    (0xF889F9ACB608BD95, "Enable Wild Battle"),
-    (0xB47AA6D4ACE0ED81, "On"),
-    (0xB47AA3D4ACE0E868, "Off"),
-    (0x72DC9B7C22B155DE, "Battle wild Pok\u00e9mon before catching them.\nTurn this off for the game\u2019s normal catching."),
-    (TRADE_TITLE, "Level-Up Trade Evolution"),
-    (TRADE_INFO, "Kadabra, Machoke, Graveler and Haunter can also\nevolve by leveling up, starting at Level 50."),
-]
 table_at = tpc()
 at = TAIL + table_slot * 4
 delta = table_at - at
 tail[table_slot] = 0x10000000 | ((delta & 3) << 29) | (((delta >> 2) & 0x7FFFF) << 5) | 10   # adr x10, table
-text_at = table_at + (len(STRINGS) + 1) * 16
-words = []
-pool = bytearray()
-for i, (h, t) in enumerate(STRINGS):
-    entry = table_at + i * 16
-    enc = t.encode("utf-16-le")
-    words.append(struct.pack("<QII", h, text_at + len(pool) - entry, len(t)))
-    pool += enc
-words.append(bytes(16))
+LABELS = (WILD_TITLE, WILD_INFO, TRADE_TITLE, TRADE_INFO)
+labels_blob = b"".join(struct.pack("<QII", h, i, 0) for i, h in enumerate(LABELS)) + bytes(16)
 tail_code = b"".join(struct.pack("<I", w) for w in tail)
-tail_blob = tail_code + b"".join(words) + bytes(pool)
-assert TAIL + len(tail_blob) <= TRADE_INFO_AT, hex(TAIL + len(tail_blob))
+tail_blob = tail_code + labels_blob
+assert TAIL + len(tail_blob) <= WILD_INFO_AT, hex(TAIL + len(tail_blob))
+wild_info_name = WILD_INFO_NAME.encode() + b"\0"
 trade_info_name = TRADE_INFO_NAME.encode() + b"\0"
+assert WILD_INFO_AT + len(wild_info_name) <= TRADE_INFO_AT
 assert TRADE_INFO_AT + len(trade_info_name) <= TAIL_END
 
-edits.append(site(0x3B2BC, "bl #0x1c35a0", bl(0x3B2BC, tail_marks["wild_get"])))
-edits.append(site(0x3B3B8, "bl #0x1c35a0", bl(0x3B3B8, tail_marks["wild_apply"])))
-edits.append(site(0x3B3D4, "bl #0x1c35a0", bl(0x3B3D4, tail_marks["wild_get"])))
-edits.append(site(0x3F4AC, "bl #0x1c35a0", bl(0x3F4AC, tail_marks["wild_get"])))
-edits.append(site(0x3F4E4, "bl #0x1c35a0", bl(0x3F4E4, tail_marks["wild_get"])))
-edits.append(site(0x3B450, "bl #0x1c3550", bl(0x3B450, tail_marks["wild_set"])))
-edits.append(site(0x678710, "stp x20, x19, [sp, #-0x20]!", b(0x678710, tail_marks["wild_text"])))
+# Strings: a table of (offset from RO_TEXT, characters) for each folder's four strings, then the text.
+assert sorted(option_text.TEXT) == list(range(10))
+ro_table = bytearray()
+ro_pool = bytearray()
+ro_start = 10 * 4 * 4
+for folder in range(10):
+    assert len(option_text.TEXT[folder]) == 4
+    for string in option_text.TEXT[folder]:
+        ro_table += struct.pack("<HH", ro_start + len(ro_pool), len(string))
+        ro_pool += string.encode("utf-16-le")
+ro_blob = bytes(ro_table) + bytes(ro_pool)
+assert RO_TEXT + len(ro_blob) <= RO_END, hex(RO_TEXT + len(ro_blob))
+print("option text", len(ro_blob), "bytes, free", RO_END - RO_TEXT - len(ro_blob))
+
+edits.append(site(0x678710, "stp x20, x19, [sp, #-0x20]!", b(0x678710, tail_marks["option_text"])))
 edits.append((TAIL, tail_blob))
+edits.append((RO_TEXT, ro_blob))
+edits.append((WILD_INFO_AT, wild_info_name))
 edits.append((TRADE_INFO_AT, trade_info_name))
-# Options row 11.
+# Options rows.
 edits.append(site(0x4276C, "bl #0x45f00", bl(0x4276C, marks["row_alloc"])))
 edits.append(site(0x42804, "ldp x29, x30, [sp, #0x60]", b(0x42804, marks["row_add"])))
 edits.append(site(0x44DD4, "cmp w24, #0xa", b(0x44DD4, marks["row_text"])))
@@ -961,13 +971,13 @@ spans = sorted((a, a + len(d)) for a, d in edits)
 for (a1, e1), (a2, _) in zip(spans, spans[1:]):
     assert e1 <= a2, f"overlap at {a2:#x}"
 
-out = bytearray(b"PATCH")
+out = bytearray(b"IPS32")     # the option text is past what 3-byte IPS offsets can reach
 for addr, data in edits:
     if addr == CAVE:
         continue
     print(f"{addr:08X}  {(dec(data[:4], addr) or ['(data)'])[0]}")
-    out += (addr + SIZE_HEADER).to_bytes(3, "big") + len(data).to_bytes(2, "big") + data
-out += (CAVE + SIZE_HEADER).to_bytes(3, "big") + len(blob).to_bytes(2, "big") + blob + b"EOF"
+    out += (addr + SIZE_HEADER).to_bytes(4, "big") + len(data).to_bytes(2, "big") + data
+out += (CAVE + SIZE_HEADER).to_bytes(4, "big") + len(blob).to_bytes(2, "big") + blob + b"EEOF"
 
 print()
 names = {v: k for k, v in marks.items()}
