@@ -30,7 +30,7 @@ The option in the Options menu:
 
 ## Features
 
-All of these can be switched off in-game, except the intro skip.
+All of these can be switched off in-game, except the intro skip and Sky Dash on D-pad Up.
 
 | Feature | What it does |
 |---|---|
@@ -42,6 +42,7 @@ All of these can be switched off in-game, except the intro skip.
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
 | **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
 | **Every game language** | Both options appear and are translated in all the game's languages, including Japanese in kana and kanji |
+| **Sky Dash on D-pad Up** | Press **Up** in the overworld to open the town map and choose Sky Dash, once you've unlocked it. Works whatever the options are set to. Not on a single Joy-Con, where Up opens the menu |
 | **Intro skip** | Press **+**, **−**, **A**, **B**, **X** or **Y** during the running Pikachu to jump to the title screen. Works whatever the options are set to |
 
 "Presented By" can't be skipped.

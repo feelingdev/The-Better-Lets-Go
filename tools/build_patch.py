@@ -792,6 +792,68 @@ for slot in trade_skips:
     code[slot] = cbz(CAVE + slot * 4, pc(), 9, wide=True)
 emit(b(pc(), 0x722BFC))
 
+# --- D-pad Up: the town map, where Sky Dash is chosen, once Sky Dash is unlocked. Up is treated as a press of the menu
+# button, so every rule for when the menu can open applies. Where the menu would open, the map opens instead.
+# On a single sideways Joy-Con, Up already is the menu button (see the map at 0x14C2B0), so the menu wins there.
+SKY_DASH_UP = FLAG + 7    # Up was what asked for the menu
+SKY_DASH_FLAG = label_hash("FSYS_HIDEN_OPEN_SORAWOTOBU")
+assert SKY_DASH_FLAG == 0x15C149D11F0E8188
+UP_BIT = 13               # raw D-pad Up, pad +0x40
+
+# x0 = pad, x1 = the menu button's mask. Returns whether the menu was asked for.
+mark("menu_button")
+emit(0xA9BE7BFD)                  # stp x29, x30, [sp, #-0x20]!
+emit(0x910003FD)                  # mov x29, sp
+emit(ldr(9, 0, 0x40))
+emit(adrp(pc(), 10, SKY_DASH_UP))
+emit(flag_strb(31, 10, SKY_DASH_UP))
+emit(0xEA01013F)                  # tst x9, x1
+menu_pressed_slot = len(code)
+emit(0)                           # b.ne yes
+up_slot = len(code)
+emit(0)                           # tbz x9, #13, no
+emit(adrp(pc(), 0, FIELD_PTR))
+emit(ldr(0, 0, FIELD_PTR & 0xFFF))
+emit(ldr(0, 0, 0))
+emit(ldr(0, 0, 0x98))
+no_slot_a = len(code)
+emit(0)                           # cbz x0, no
+emit(ldr(0, 0, 0x58))
+emit(ldr(0, 0, 0x80))
+no_slot_b = len(code)
+emit(0)                           # cbz x0, no
+mov_x1(SKY_DASH_FLAG)
+emit(bl(pc(), 0x1C3F10))
+no_slot_c = len(code)
+emit(0)                           # tbz w0, #0, no
+emit(adrp(pc(), 10, SKY_DASH_UP))
+emit(0x52800029)                  # mov w9, #1
+emit(flag_strb(9, 10, SKY_DASH_UP))
+code[menu_pressed_slot] = b_cond(CAVE + menu_pressed_slot * 4, pc(), 1)
+emit(0x52800020)                  # mov w0, #1
+emit(b(pc(), pc() + 8))
+no_at = pc()
+emit(MOV_W0_ZERO)
+emit(0xA8C27BFD)                  # ldp x29, x30, [sp], #0x20
+emit(RET)
+code[up_slot] = 0x36000000 | (UP_BIT << 19) | (((no_at - (CAVE + up_slot * 4)) >> 2) << 5) | 9
+code[no_slot_a] = cbz(CAVE + no_slot_a * 4, no_at, 0, wide=True)
+code[no_slot_b] = cbz(CAVE + no_slot_b * 4, no_at, 0, wide=True)
+code[no_slot_c] = 0x36000000 | (((no_at - (CAVE + no_slot_c * 4)) >> 2) << 5)
+
+# Where the menu opens: the game's own town map event if Up asked, the same call its scripts use.
+mark("menu_open")
+emit(adrp(pc(), 9, SKY_DASH_UP))
+emit(flag_ldrb(10, 9, SKY_DASH_UP))
+open_menu_slot = len(code)
+emit(0)                           # cbz w10, menu
+emit(flag_strb(31, 9, SKY_DASH_UP))
+emit(bl(pc(), 0x19E2C0))
+emit(b(pc(), 0x2F8D74))
+code[open_menu_slot] = cbz(CAVE + open_menu_slot * 4, pc(), 10)
+emit(original(0x2F8D10))
+emit(b(pc(), 0x2F8D14))
+
 blob = b"".join(struct.pack("<I", w) for w in code)
 assert CAVE + len(blob) <= LIMIT, hex(CAVE + len(blob))
 
@@ -968,6 +1030,9 @@ edits.append(site(0x3B37C, "ldp x29, x30, [sp, #0x10]", b(0x3B37C, marks["row_lo
 edits.append(site(0x3B404, "ldr x0, [x8, #8]", b(0x3B404, marks["row_apply"])))
 edits.append(site(0x3F494, "ldr x0, [x19, #8]", b(0x3F494, marks["row_changed"])))
 edits.append(site(0x722BF8, "ldr w8, [x20]", b(0x722BF8, marks["trade_evolution"])))
+# D-pad Up.
+edits.append(site(0x2F810C, "bl #0x13f540", bl(0x2F810C, marks["menu_button"])))
+edits.append(site(0x2F8D10, "ldr x1, [x19]", b(0x2F8D10, marks["menu_open"])))
 
 print("--- tail code")
 names2 = {v: k for k, v in tail_marks.items()}

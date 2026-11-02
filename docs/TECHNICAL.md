@@ -25,6 +25,7 @@ Runtime bytes:
 | `0x1EE0F04` | 1 when the option is Off |
 | `0x1EE0F05` | The Options screen's working value for Level-Up Trade Evolution |
 | `0x1EE0F06` | The Options screen's working value for Enable Wild Battle |
+| `0x1EE0F07` | D-pad Up asked for the menu this frame, so open the town map instead |
 | `0x1EE0F08` | Layout playing the logo animation |
 
 ## Encounters
@@ -73,6 +74,12 @@ Rows 11 and 12 are added last in every language, so Japanese shows 13 rows and t
 This is row ID 11. The layout has 10 row slots (`item_button_00`-`09`) that the list recycles as it scrolls, so its length comes from the data. The choice is bit 30 of the saved settings word (`+0x54`): 0 = Off.
 
 `0x722B90` decides whether a Pokémon can evolve for a given record, and its first check is the record's minimum level. Method 4 (level-up) then passes and method 5 (trade) fails. `0x722BF8` makes method 5 pass at Level 50 or above when the bit is set, so it follows the same route as a normal level-up evolution. Trading doesn't use this check, since method 5 always fails there.
+
+## Sky Dash on D-pad Up
+
+- `0x2F810C` is the overworld's test for the menu button. It's replaced so that raw D-pad Up (bit 13 of pad `+0x40`) counts as well, if the flag `FSYS_HIDEN_OPEN_SORAWOTOBU` is set, and `0x1EE0F07` records that Up was the reason. Every rule the game then applies to opening the menu still applies.
+- `0x2F8D10` is where the menu opens. With `0x1EE0F07` set, it calls `0x19E2C0` instead, the function behind the script command `ExecuteShowTownMapEvent_`.
+- The menu button's own press wins. On a single sideways Joy-Con, Up already sets that button's action bit (the map at `0x14C2B0`), so it still opens the menu. Two-handed setups map Up to no action (the table at `0xF49E04`).
 
 ## Intro skip
 
