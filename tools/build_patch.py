@@ -290,6 +290,9 @@ def result_stub(name, site, reg):
 # --- Battle Bag: Master, Ultra, Great, Poke and Premier Balls list in the battle items tab, only with the option on.
 mark("bag_filter")
 emit(struct.unpack_from("<I", image, 0xD2D7C4)[0])  # the original byte load
+load_off()                        # no balls in the game's own scripted fights
+bag_special_slot = len(code)
+emit(0)
 bag_skips = []
 read_setting(10, bag_skips)
 emit(0xB9400000 | ((0x54 // 4) << 10) | (10 << 5) | 10)  # ldr w10, [x10, #0x54]
@@ -306,6 +309,7 @@ emit(0x54000001 | (2 << 5))       # b.ne, to the branch back
 assert pc() == at + 12
 emit(0x52800048)                  # mov w8, #2
 code[bag_off_slot] = 0x37000000 | (31 << 19) | (((pc() - (CAVE + bag_off_slot * 4)) >> 2) << 5) | 10  # tbnz w10, #31, back
+code[bag_special_slot] = cbz(CAVE + bag_special_slot * 4, pc(), 16, nz=True)
 emit(b(pc(), 0xD2D7C8))
 
 result_stub("result_a", 0x9D3860, 20)
@@ -482,8 +486,10 @@ emit(b(pc(), 0x3057BC))
 emit(ldr(20, 8, 0x68))
 emit(b(pc(), 0x3057BC))
 
-mark("event_sync")                # battle-then-catch event from a script: refresh too
-sync_off()
+mark("event_sync")                # the game's own battle-then-catch event (Snorlax, Legendaries and other scripted fights): always the original mechanic. The next encounter refreshes this.
+emit(adrp(pc(), 16, WILD_OFF))
+emit(0x52800029)                  # mov w9, #1
+emit(0x39000209 | ((WILD_OFF & 0xFFF) << 10))       # strb w9, [x16, #off]
 emit(b(pc(), 0x28BC40))
 
 mark("encounter_start")
@@ -492,11 +498,15 @@ emit(cbz(pc(), pc() + 8, 16))
 emit(b(pc(), 0x2F6470))
 emit(b(pc(), marks["start_battle"]))
 
-mark("post_catch")                # the original follow-up only belongs to the normal catch flow
-load_off()
-emit(cbz(pc(), pc() + 8, 16))
-emit(b(pc(), 0x305970))
+mark("post_catch")                # the original follow-up only belongs to the normal catch flow. Reads the save: this may run before an encounter refreshes WILD_OFF.
+post_catch_skips = []
+read_setting(9, post_catch_skips)
+emit(0xB9405529)                  # ldr w9, [x9, #0x54]
+emit(0x37F80049)                  # tbnz w9, #31, over the next instruction
 emit(RET)
+for slot in post_catch_skips:
+    code[slot] = cbz(CAVE + slot * 4, pc(), 9, wide=True)
+emit(b(pc(), 0x305970))
 
 mark("tier")
 load_off()
@@ -983,6 +993,7 @@ print()
 names = {v: k for k, v in marks.items()}
 listing = list(md.disasm(blob, CAVE))
 assert len(listing) == len(code), "a word did not decode"
+assert 0 not in code and 0 not in tail, "an unpatched slot"
 for ins in listing:
     if ins.address in names:
         print(f"-- {names[ins.address]}")

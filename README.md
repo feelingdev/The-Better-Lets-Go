@@ -81,13 +81,11 @@ The patch ends up here:
 - **Turn it off:** go to **Options → Enable Wild Battle**.
 - **Evolve without trading:** turn on **Options → Level-Up Trade Evolution**, then level up at Level 50 or above. A Pokémon at Level 100 can't level up, so it can't evolve this way.
 
-Beating a Pokémon gives no chance to catch it, so **pick a ball before you finish the fight**.
+Beating a Pokémon gives no chance to catch it, so **pick a ball before you finish the fight**. Snorlax, Legendaries and other scripted wild fights are different: they play as in the original game, with no balls in the battle Bag, and you catch them after you win.
 
 ## Warnings
 
-- **Legendaries and Snorlax:** with the option On, beating one means you can't catch it, and it may be gone for good. Save first, and pick a ball instead of finishing the fight.
 - **Stay offline.** Stay out of GO Park, and don't use online features with this patch. Modified games can get your console banned, and the patch overwrites part of a library that handles online data, which could crash if online features ever used it.
-- **Story catches:** a scripted catch might not count if you win the battle instead. This is untested. If a story moment hangs or repeats, turn the option Off.
 
 ## Known limitations
 

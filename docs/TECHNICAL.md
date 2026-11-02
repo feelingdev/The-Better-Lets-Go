@@ -50,7 +50,8 @@ On early saves, the partner's send-out needs a buddy model the trainer doesn't h
 
 - "Enable Wild Battle" is its own row, ID 12, in every language. The Hiragana/Kanji row is left alone.
 - The choice is bit 31 of the saved settings word (`+0x54`): 0 = On, so existing saves start On. Accessors for this word only use bits 0-19.
-- The setting is copied to `0x1EE0F04` at each encounter (`0x3057B8`) and scripted event (`0x289B80`), and each patched behaviour checks it.
+- The setting is copied to `0x1EE0F04` at each encounter (`0x3057B8`), and each patched behaviour checks it.
+- The game's own battle-then-catch event (`0x289B80`, its only route to `0x28BC40`, used for scripted fights such as Snorlax and the Legendaries) sets `0x1EE0F04` to 1 instead, whatever the option says, so those fights run the original mechanic. The patch's normal encounters call `0x28BC40` directly, so they don't pass through it. The value can stay set after the fight, which only means original behaviour, until the next encounter refreshes it. The Bag filter (`0xD2D7C4`) checks it too, so no balls are listed. `0x2FDF34` and `0x2FDF80` read the save directly, because they may run before that refresh.
 
 ## The new Options rows
 
