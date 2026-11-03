@@ -38,7 +38,6 @@ All of these can be switched off in-game, except the intro skip and Sky Dash on 
 | **EXP on a win** | The wild Pokémon faints as in a trainer battle, then you get EXP, then any evolution, then you're back in the overworld |
 | **Catch from the Bag** | Pick a Poké Ball in the battle Bag to end the battle and open the catch screen, starting on that ball. You get EXP if you catch it, none if you run |
 | **No battle timer** | The time limit on these battles is removed |
-| **Works on early saves** | Works before "Play with Pikachu" unlocks, and on a brand-new save |
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
 | **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
 | **"Exp. Share" option** | On/Off in the Options menu, saved with your game. On by default, as in the original game. Off gives EXP only to Pokémon that fought, in every battle that gives EXP, when you catch with a ball from the Bag, and when you catch Snorlax or a Legendary after fighting it. After those catches, the game names each Pokémon that got EXP. Catching with no battle at all still gives EXP to the whole party |
@@ -102,10 +101,10 @@ Tested by the author on one Switch. **This build changed how the code is organis
 | Area | Status |
 |---|---|
 | Options row, text and saving the choice | Tested |
-| Catch screen opening on the picked ball | Tested on an earlier build |
-| Level-Up Trade Evolution option and evolving at Level 50 | **Not tested** |
-| +, −, A, B, X and Y skipping the running Pikachu | **Not tested** (+ and − were, on an earlier build) |
-| Timer, EXP on a win, evolution, early saves | Tested on an older version of the project |
+| Catch screen opening on the picked ball | Tested |
+| Level-Up Trade Evolution option and evolving at Level 50 | Tested |
+| +, −, A, B, X and Y skipping the running Pikachu | Tested |
+| Timer, EXP on a win, evolution, early saves | Tested |
 | Option Off restoring the original mechanic | Tested |
 | No catch screen after a win, catch EXP, ball count | Tested |
 | Losing, running, trainer battles, long sessions | Tested |
