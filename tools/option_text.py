@@ -1,5 +1,5 @@
-"""Text for the patch's two Options rows, by the game's message folder index (the word at 0x1614B34).
-Each entry: Enable Wild Battle title, its description, Level-Up Trade Evolution title, its description.
+"""Text for the patch's Options rows, by the game's message folder index (the word at 0x1614B34).
+Each TEXT entry: Enable Wild Battle title, its description, Level-Up Trade Evolution title, its description.
 Written by Claude, using the game's own terms and Pokémon names. Corrections from native speakers are welcome."""
 
 FOLDERS = {
@@ -76,4 +76,18 @@ TEXT = {
         "無需交換進化",
         "勇基拉、豪力、隆隆石、鬼斯通\n從等級50起無需交換也能進化。",
     ),
+}
+
+# The Exp. Share row: title, description. The titles are the game's own item name in each language.
+EXP_SHARE_TEXT = {
+    0: ("がくしゅうそうち", "オフで　たたかった　ポケモンだけが\nけいけんちを　もらいます"),
+    1: ("がくしゅうそうち", "オフで　戦った　ポケモンだけが\n経験値を　もらいます"),
+    2: ("Exp. Share", "Off: only Pokémon that fought earn Exp. Points."),
+    3: ("Multi Exp", "Désactivé : seuls les combattants gagnent des Exp."),
+    4: ("Condividi esp.", "Con No, solo chi ha lottato ottiene Esp."),
+    5: ("EP-Teiler", "Bei „Aus“ nur EP für Pokémon, die gekämpft haben."),
+    6: ("Repartir Exp", "Con No, solo ganan Exp. los que han combatido."),
+    7: ("학습장치", "Off로 하면 싸운 포켓몬만 경험치를 얻습니다"),
+    8: ("学习装置", "关闭后只有出场的宝可梦能获得经验值。"),
+    9: ("學習裝置", "關閉後只有出場的寶可夢能獲得經驗值。"),
 }

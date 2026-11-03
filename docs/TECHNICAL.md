@@ -10,7 +10,7 @@ One IPS32 file, named after the build ID, in `atmosphere/exefs_patches/<folder>/
 
 | Range | Use | Why it's safe |
 |---|---|---|
-| `0x6F6830-0x6F70F0` | Main code | Protobuf `Tokenizer::ConsumeString` and `ConsumeNumber`, entered only from `Tokenizer::Next` during text-format parsing, which normal play doesn't appear to use. If it ever ran, the game would crash |
+| `0x6F6830-0x6F7670` | Main code, then the Exp. Share row's text | Protobuf `Tokenizer::ConsumeString`, `ConsumeNumber` and the comment functions after them, entered only from `Tokenizer::Next` during text-format parsing, which normal play doesn't appear to use. If it ever ran, the game would crash |
 | `0xD32BB0-0xD33000` | Option text lookup and label names | Zero padding after the text section |
 | `0x1526180-0x1527000` | Option text in every language | Zero padding after the read-only section |
 | `0x1EE0F00` onward | Runtime state | Padding past the end of `.bss`, in the same mapped page |
@@ -28,6 +28,10 @@ Runtime bytes:
 | `0x1EE0F06` | The Options screen's working value for Enable Wild Battle |
 | `0x1EE0F07` | D-pad Up asked for the menu this frame, so open the town map instead |
 | `0x1EE0F08` | Layout playing the logo animation |
+| `0x1EE0F10` | The Options screen's working value for Exp. Share |
+| `0x1EE0F11` | The player's Pokémon that have been on the field in this battle: bit n = battle ID n |
+| `0x1EE0F12` | Catch screen: 1 + the next party slot to name in an EXP message, 0 = not naming anyone |
+| `0x1EE0F18` | Catch screen: the word set its messages fill in, 8 bytes |
 
 ## Encounters
 
@@ -37,6 +41,7 @@ Runtime bytes:
 
 - The battle's EXP gate at `0x9D8A30` is opened at `0x9D8A44` and `0x9D8A5C`.
 - The time limit written at `0x28C894` becomes 0.
+- Setup flag `0x80` marks a battle that leads to a catch, so the game keeps the opponent standing: no "fainted" line (`0x9FCF38`) and no animation (`0xA8A958`). Normal wild battles show both, because a win doesn't lead to a catch. Scripted fights keep the original. The animation's sequence (`ee620`) aims at the fainted Pokémon's trainer, which a wild Pokémon doesn't have, and the joint lookup at `0xA9C650` crashes on the missing model; `0xA8A9D8` therefore stores the game's "no target" value `0xFF` for an opponent in a flag `0x80` battle. That sequence is also a return to the Poké Ball, so while it plays for a wild Pokémon a marker makes its particles (`0xAE09D0`) and ball sound (`0xAE9D38`) do nothing; its lying-down motion, shrink and hide stay. `0xA8AC14` clears the marker when the sequence ends.
 - After a win, the post-battle object goes to its evolution loop (`0x319EB4`). When that ends, `0x319DA4` only continues to catch setup if a ball was picked.
 - The catch screen's EXP calls (`0x830074`, `0x830828`, `0x8315E4`) only run if a ball was picked.
 
@@ -57,24 +62,33 @@ On early saves, the partner's send-out needs a buddy model the trainer doesn't h
 
 ## The new Options rows
 
-Rows 11 and 12 are added last in every language, so Japanese shows 13 rows and the others 12.
+Rows 12, 11 and 13 are added last in every language, in that order, so Japanese shows 14 rows and the others 13.
 
-- `0x4276C` allocates room for two more rows, and `0x42804` adds them through `0x46980`. The builder's own array holds only 11 IDs.
+- `0x4276C` allocates room for three more rows, and `0x42804` adds them through `0x46980`. The builder's own array holds only 11 IDs.
 - `0x44DD4` (text), `0x3F8D8` (toggle) and `0x452D4` (arrow reaction) stop at ID 10, so each is extended.
 - `0x3EBC0` reads the description's label name from a table at `0x152A028` whose entry 11 is null, so these rows bring their own names.
-- `0x3B37C` loads both choices to the working bytes, `0x3B404` applies them, and `0x3F494` counts them as a change.
+- `0x3B37C` loads the choices to the working bytes, `0x3B404` applies them, and `0x3F494` counts them as a change.
 
 ## Option text
 
-- `0x678710`, the text lookup, watches for this patch's four labels: each row's title and description. Anything else goes to the game as usual.
+- `0x678710`, the text lookup, watches for this patch's six labels: each row's title and description. Anything else goes to the game as usual.
 - It picks the language from the word at `0x1614B34`, the message folder the game is using (`0x1B31E0`): 0 Japanese kana, 1 Japanese kanji, 2 English, 3 French, 4 Italian, 5 German, 6 Spanish, 7 Korean, 8 Simplified Chinese, 9 Traditional Chinese. Anything else falls back to English.
-- The strings come from `tools/option_text.py`. On and Off use Movie Skipping's own labels, already translated by the game.
+- The strings come from `tools/option_text.py`. On and Off use Movie Skipping's own labels, already translated by the game. The Exp. Share row's strings sit after the main code, because the read-only padding ran out of room, and its titles are the game's own item name in each language.
 
 ## Level-Up Trade Evolution
 
 This is row ID 11. The layout has 10 row slots (`item_button_00`-`09`) that the list recycles as it scrolls, so its length comes from the data. The choice is bit 30 of the saved settings word (`+0x54`): 0 = Off.
 
 `0x722B90` decides whether a Pokémon can evolve for a given record, and its first check is the record's minimum level. Method 4 (level-up) then passes and method 5 (trade) fails. `0x722BF8` makes method 5 pass at Level 50 or above when the bit is set, so it follows the same route as a normal level-up evolution. Trading doesn't use this check, since method 5 always fails there.
+
+## Exp. Share
+
+This is row ID 13. The choice is bit 29 of the saved settings word (`+0x54`): 0 = On, so existing saves start On.
+
+- `0x9DBD70` is the game's own test for sharing EXP with Pokémon that didn't fight. Its only callers are the EXP calculation (`0xA67C64`, `0xA67E20`), and when it answers no, the formula at `0x9D0D40` gives those Pokémon nothing. With the row Off, it answers no. This covers every battle that gives EXP, trainer battles included. A Pokémon counts as having fought if it was on the field while the defeated Pokémon was, as the game records at `0x9E3C60`.
+- The catch screen works out its own EXP, and neither a ball from the Bag nor a scripted fight such as Snorlax runs the battle's calculation first. So `0x9E3C60` also keeps the player's side of that record in `0x1EE0F11`, cleared at `0x28BDB8`, and the catch screen's per-Pokémon calls (`0x830828`, `0x8315E4`) give 0 to anyone not in it. This assumes a battle ID is the party slot, and that the opponent's IDs are 6 or above; neither has been traced to where it's set.
+- The catch screen's single line, "Your Pokémon got N Exp. Points!", would read as the whole party. So with the row Off after a fight, `0x83008C` shows the game's other line, `poke_get_result_01_01_mb` ("*name* got N Exp. Points!"), for the first fighter who can get EXP, and `0x830024`, where the message-wait state ends, shows it for the rest. Each amount comes from the same call the EXP step uses, so it matches what the Pokémon receives. If no fighter can get EXP, such as at Level 100, the game's normal flow runs.
+- Catching with no battle keeps the game's own EXP for the whole party. `0x2F6470`, which launches those catches, clears `0x1EE0F11`, and an empty record means nobody is left out. Its route through `0x2F6440` doesn't clear it, because only the battle-then-catch event's own code calls that (`0x28E934` leads to one of the two calls). What those calls are for hasn't been traced.
 
 ## Sky Dash on D-pad Up
 

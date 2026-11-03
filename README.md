@@ -24,9 +24,9 @@ A patch for **Pokémon: Let's Go, Pikachu!** on modded Nintendo Switch. It lets 
 |---|---|
 | ![With the option On, a wild Rattata starts a battle with Pikachu](docs/images/option-on.gif) | ![With the option Off, a wild Rattata goes straight to the normal catch screen](docs/images/option-off.gif) |
 
-The option in the Options menu:
+The options in the Options menu:
 
-<img src="docs/images/option.jpg" width="600" alt="The Enable Wild Battle row in the Options menu, with its description">
+<img src="docs/images/option.jpg" width="600" alt="The Options menu with Enable Wild Battle selected and its description shown, above the Level-Up Trade Evolution and Exp. Share rows">
 
 ## Features
 
@@ -35,13 +35,14 @@ All of these can be switched off in-game, except the intro skip and Sky Dash on 
 | Feature | What it does |
 |---|---|
 | **Wild battles** | Wild encounters start a real battle instead of going straight to catching |
-| **EXP on a win** | Winning gives EXP, then any evolution, then back to the overworld |
+| **EXP on a win** | The wild Pokémon faints as in a trainer battle, then you get EXP, then any evolution, then you're back in the overworld |
 | **Catch from the Bag** | Pick a Poké Ball in the battle Bag to end the battle and open the catch screen, starting on that ball. You get EXP if you catch it, none if you run |
 | **No battle timer** | The time limit on these battles is removed |
 | **Works on early saves** | Works before "Play with Pikachu" unlocks, and on a brand-new save |
 | **"Enable Wild Battle" option** | On/Off in the Options menu, saved with your game. On by default. Off uses the original catching mechanic |
 | **"Level-Up Trade Evolution" option** | On/Off in the Options menu, saved with your game. Off by default. On lets Kadabra, Machoke, Graveler and Haunter also evolve by leveling up, starting at Level 50. Trading still works |
-| **Every game language** | Both options appear and are translated in all the game's languages, including Japanese in kana and kanji |
+| **"Exp. Share" option** | On/Off in the Options menu, saved with your game. On by default, as in the original game. Off gives EXP only to Pokémon that fought, in every battle that gives EXP, when you catch with a ball from the Bag, and when you catch Snorlax or a Legendary after fighting it. After those catches, the game names each Pokémon that got EXP. Catching with no battle at all still gives EXP to the whole party |
+| **Every game language** | All the options appear and are translated in all the game's languages, including Japanese in kana and kanji |
 | **Sky Dash on D-pad Up** | Press **Up** in the overworld to open the town map and pick a place to fly to, once you've unlocked Sky Dash. **B** takes you back to the overworld. Works whatever the options are set to. Not on a single Joy-Con, where Up opens the menu |
 | **Intro skip** | Press **+**, **−**, **A**, **B**, **X** or **Y** during the running Pikachu to jump to the title screen. Works whatever the options are set to |
 
@@ -80,6 +81,7 @@ The patch ends up here:
 - **Battle:** walk into a wild Pokémon as usual.
 - **Catch:** open **Bag** in battle and pick a Poké Ball.
 - **Turn it off:** go to **Options → Enable Wild Battle**.
+- **Give EXP only to Pokémon that fought:** go to **Options → Exp. Share** and turn it off.
 - **Fly:** press **Up** in the overworld, then pick a place on the map with **A**.
 - **Evolve without trading:** turn on **Options → Level-Up Trade Evolution**, then level up at Level 50 or above. A Pokémon at Level 100 can't level up, so it can't evolve this way.
 
