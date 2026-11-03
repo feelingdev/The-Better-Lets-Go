@@ -1,6 +1,6 @@
 # How the patch works
 
-These are notes on `tools/build_patch.py`, from static analysis of `main` in Let's Go, Pikachu! 1.0.2 (build `C208DB6A4EF4361F28B8402BE0F7CD9A`). Addresses are memory addresses: IPS offset minus 0x100. Names are descriptive guesses, because the game ships without symbols.
+These are notes on `tools/build_patch.py`, from static analysis of `main` in Let's Go, Pikachu! 1.0.2 (build `C208DB6A4EF4361F28B8402BE0F7CD9A`). Addresses are memory addresses: IPS offset minus 0x100. Names are descriptive guesses, because the game ships without symbols. All addresses here are Pikachu's; see [Let's Go, Eevee!](#lets-go-eevee) for the other game.
 
 ## Format
 
@@ -10,7 +10,7 @@ One IPS32 file, named after the build ID, in `atmosphere/exefs_patches/<folder>/
 
 | Range | Use | Why it's safe |
 |---|---|---|
-| `0x6F6830-0x6F7670` | Main code, then the Exp. Share row's text | Protobuf `Tokenizer::ConsumeString`, `ConsumeNumber` and the comment functions after them, entered only from `Tokenizer::Next` during text-format parsing, which normal play doesn't appear to use. If it ever ran, the game would crash |
+| `0x6F6830-0x6F7B10` | Main code, then the Exp. Share row's text | Protobuf `Tokenizer::ConsumeString`, `ConsumeNumber`, the comment functions after them and `Tokenizer::Next` itself. Only the text-format parser calls them, and nothing in that parser's whole call tree is referenced from data or has its address taken, so normal play can't reach it. If it ever ran, the game would crash |
 | `0xD32BB0-0xD33000` | Option text lookup and label names | Zero padding after the text section |
 | `0x1526180-0x1527000` | Option text in every language | Zero padding after the read-only section |
 | `0x1EE0F00` onward | Runtime state | Padding past the end of `.bss`, in the same mapped page |
@@ -52,6 +52,8 @@ The battle Bag's filter at `0xD2D7C4` lists Master, Ultra, Great, Poké and Prem
 ## Early saves
 
 On early saves, the partner's send-out needs a buddy model the trainer doesn't have. `0xA993E0` sets a byte on the trainer object (`+0x110`) in wild battles. The cause is a theory that the fix supports, not something proven.
+
+That byte is the partner's kind: 1 is Pikachu and 2 is Eevee, the value each game's initialiser at `0xA7600` writes, and the build reads it from there. Byte 1 of the same record says whether the partner is female, which gives Pikachu its heart-tipped tail (`0xDE500` picks between the model's "male" and "female" tails). The patch doesn't touch it, so the game's own value is used.
 
 ## The option
 
@@ -106,3 +108,17 @@ The running Pikachu is frames 0-500 of the title demo `sd9010_title`. The frame 
 The Pokémon logo is a layout animation on its own clock, so `anime_in` is also set to its last frame. The set-frame call clamps anything past the end.
 
 The input is the pad's button field (`+0x40`) masked with `0xC0F`: the raw bits for A, B, X, Y, + and −. The field also holds the game's action bits, set by the maps at `0x14C2B0` and `0x14C550`, but those can't be used, because bit 57 also covers L, R, ZL, ZR and the stick clicks.
+
+## Caught marker
+
+The battle HUD (`battle_top_00`) has no "caught" icon, but it has the ball row trainer battles use for their party, and the opponent's copy (`L_ballPlate_01`) is hidden in wild battles (`0xAF8170`, when `0xAC0790` returns 1). The HUD's update ends with that row's own update (`0xAC2540` to `0xAF8530`). The patch runs after it, every frame:
+
+- In a wild battle, it fetches the opponent (battle position 1) the way the HP box does (`0xABE6F0`, then the Pokémon data at `+0x60`), reads its species (`0x7247C0`), and asks the Pokédex whether that species is caught (`0x1D0150`, the check the catch screen uses for "New Pokémon").
+- If it is, and an enemy HP box is shown (`L_pokePlate_03`, or `02`), it shows the row with only ball 0, set to the normal Poké Ball through the game's own setter (`0xAF83A0`), and hides the other balls and the row's background. Otherwise it hides the row.
+- It places the row so ball 0 sits 4 pixels left of the box's background, vertically centred, from the live positions of the box, its background and both parent panes, so it follows the box as it slides in and out.
+
+Panes are found by hash in the layout's table at `+0x220` (count at `+0x228`), with the hashes read from `layout_setting_battle_top_00.bin`. A pane's position is at `+0x30`, scale at `+0x48`, size at `+0x50` and flags at `+0x58` (bit 0 visible, bit 4 matrix out of date), as the layout animation code uses them (`0x4A5C58`, `0x4A5BD8`).
+
+## Let's Go, Eevee!
+
+Eevee 1.0.2 (build `5831EC64D6B696FD69E69505821B97B1`) has the same code as Pikachu, moved by small amounts that change from place to place (-0x30, -0x10, 0, +0x30 or +0x60). Its data, `.bss` and padding layout are the same, and the game files the patch depends on are identical. `tools/make_address_map.py` finds each address the build uses by matching the instructions around it, with branch targets and page offsets masked out, and checks that every match is unique and the same instruction. It writes `tools/address_map_eevee.py`, and `build_patch.py` translates through it with `A()` when it sees Eevee's build ID. The only difference in the patch itself is the partner's kind (see [Early saves](#early-saves)).
